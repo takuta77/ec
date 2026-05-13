@@ -16,6 +16,7 @@ class CartStatus(str, enum.Enum):
     submitted = "submitted"
     ordered = "ordered"
     failed = "failed"
+    cancelled = "cancelled"
 
 
 class Cart(Base):
