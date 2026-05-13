@@ -56,3 +56,44 @@ def jwt_keys() -> tuple[str, str]:
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     ).decode()
     return priv, pub
+
+
+@pytest.fixture
+async def app_with_db(database_url, jwt_keys, monkeypatch):
+    priv, pub = jwt_keys
+    from pathlib import Path
+    import tempfile
+
+    priv_path = Path(tempfile.mkstemp(suffix=".pem")[1])
+    priv_path.write_text(priv)
+    pub_path = Path(tempfile.mkstemp(suffix=".pem")[1])
+    pub_path.write_text(pub)
+
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("RABBITMQ_URL", "amqp://guest:guest@localhost/")
+    monkeypatch.setenv("JWT_PRIVATE_KEY_PATH", str(priv_path))
+    monkeypatch.setenv("JWT_PUBLIC_KEY_PATH", str(pub_path))
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+
+    from app.core.config import get_settings
+    get_settings.cache_clear()
+
+    from app.db.session import init_engine, dispose_engine
+    from app.db.base import Base
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    e = create_async_engine(database_url, future=True)
+    async with e.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    await e.dispose()
+
+    init_engine()
+    from app.main import create_app
+    app = create_app()
+    yield app
+    await dispose_engine()
+
+    e = create_async_engine(database_url, future=True)
+    async with e.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await e.dispose()
