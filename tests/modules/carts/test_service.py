@@ -135,7 +135,7 @@ async def test_cancel_returns_404_when_no_open(db_session):
 async def test_reopen_restores_failed_timeout_cart(db_session):
     from app.modules.outbox.repository import OutboxRepository
     from app.modules.carts.models import Cart, CartStatus
-    from sqlalchemy import select, update as sql_update
+    from sqlalchemy import update as sql_update
 
     u = await UsersRepository(db_session).create(email="re@example.com", hashed_password="h")
     item = await ItemsRepository(db_session).create(name="X", price_cents=300, currency="JPY")
@@ -219,8 +219,6 @@ async def test_reopen_raises_409_when_open_cart_already_exists(db_session):
     from app.core.exceptions import OpenCartAlreadyExistsError
     from app.modules.outbox.repository import OutboxRepository
     from app.modules.carts.models import Cart, CartStatus
-    from sqlalchemy import insert as sql_insert
-    import uuid as _uuid
 
     u = await UsersRepository(db_session).create(email="re2@example.com", hashed_password="h")
     item = await ItemsRepository(db_session).create(name="X", price_cents=200, currency="JPY")

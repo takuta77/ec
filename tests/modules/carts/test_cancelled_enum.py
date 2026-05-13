@@ -1,4 +1,3 @@
-import pytest
 
 from app.modules.carts.models import CartStatus
 
