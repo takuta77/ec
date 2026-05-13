@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.carts.models import Cart, CartItem, CartStatus
@@ -52,3 +52,19 @@ class CartsRepository:
     async def list_lines(self, cart_id: uuid.UUID) -> list[CartItem]:
         result = await self.session.execute(select(CartItem).where(CartItem.cart_id == cart_id))
         return list(result.scalars().all())
+
+    async def transition_on_order_result(
+        self,
+        *,
+        checkout_request_id: uuid.UUID,
+        new_status: CartStatus,
+        order_id: uuid.UUID | None,
+        failure_reason: str | None,
+    ) -> int:
+        stmt = (
+            update(Cart)
+            .where(Cart.checkout_request_id == checkout_request_id, Cart.status == CartStatus.submitted)
+            .values(status=new_status, order_id=order_id, failure_reason=failure_reason)
+        )
+        result = await self.session.execute(stmt)
+        return result.rowcount or 0

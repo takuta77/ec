@@ -83,3 +83,19 @@ class CartsService:
             headers=headers,
         )
         return CheckoutOut(checkout_request_id=checkout_request_id)
+
+    async def apply_order_result(
+        self,
+        *,
+        event_type: str,
+        checkout_request_id: uuid.UUID,
+        order_id: uuid.UUID | None,
+        failure_reason: str | None,
+    ) -> int:
+        new_status = CartStatus.ordered if event_type == "order.created" else CartStatus.failed
+        return await self.carts.transition_on_order_result(
+            checkout_request_id=checkout_request_id,
+            new_status=new_status,
+            order_id=order_id,
+            failure_reason=failure_reason,
+        )

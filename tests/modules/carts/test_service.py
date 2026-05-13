@@ -60,3 +60,38 @@ async def test_submit_checkout_writes_outbox_and_marks_submitted(db_session):
     assert ev.payload["data"]["total_cents"] == 600
     assert ev.payload["data"]["items"][0]["quantity"] == 3
     assert ev.headers["traceparent"] == "00-aaaa-bbbb-01"
+
+
+async def test_apply_order_created_transitions_only_from_submitted(db_session):
+    from app.modules.outbox.repository import OutboxRepository
+    users = UsersRepository(db_session)
+    items_repo = ItemsRepository(db_session)
+    u = await users.create(email="a@example.com", hashed_password="h")
+    i = await items_repo.create(name="X", price_cents=100, currency="JPY")
+    await db_session.commit()
+
+    svc = CartsService(CartsRepository(db_session), items_repo, outbox=OutboxRepository(db_session))
+    await svc.add_item(user_id=u.id, item_id=i.id, quantity=1)
+    await db_session.commit()
+    submission = await svc.submit_checkout(user_id=u.id)
+    await db_session.commit()
+
+    import uuid as _uuid
+    affected = await svc.apply_order_result(
+        event_type="order.created",
+        checkout_request_id=submission.checkout_request_id,
+        order_id=_uuid.uuid4(),
+        failure_reason=None,
+    )
+    await db_session.commit()
+    assert affected == 1
+
+    # Late duplicate / late order.failed: no-op
+    affected2 = await svc.apply_order_result(
+        event_type="order.failed",
+        checkout_request_id=submission.checkout_request_id,
+        order_id=None,
+        failure_reason="out_of_stock",
+    )
+    await db_session.commit()
+    assert affected2 == 0
