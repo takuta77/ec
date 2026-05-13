@@ -37,3 +37,13 @@ async def test_bump_attempts_and_dead_letter(db_session):
     await db_session.commit()
     rows = await repo.fetch_unpublished(limit=10)
     assert all(r.id != row.id for r in rows)
+
+
+async def test_processed_events_try_insert(db_session):
+    from app.modules.outbox.processed import ProcessedEventsRepository
+    repo = ProcessedEventsRepository(db_session)
+    eid = uuid.uuid4()
+    assert await repo.try_insert(eid, "order.created") is True
+    await db_session.commit()
+    assert await repo.try_insert(eid, "order.created") is False
+    await db_session.commit()
