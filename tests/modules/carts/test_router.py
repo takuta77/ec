@@ -18,13 +18,13 @@ async def test_open_cart_and_add_remove(app_with_db, db_session):
 
     async with AsyncClient(transport=ASGITransport(app=app_with_db), base_url="http://t") as c:
         h = await _auth(c)
-        r = await c.get("/carts/me", headers=h)
+        r = await c.get("/cart", headers=h)
         assert r.status_code == 200 and r.json()["status"] == "open"
 
-        r = await c.post("/carts/me/items", json={"item_id": str(item.id), "quantity": 2}, headers=h)
+        r = await c.post("/cart/items", json={"item_id": str(item.id), "quantity": 2}, headers=h)
         assert r.status_code == 200
         assert r.json()["lines"][0]["quantity"] == 2
 
-        r = await c.delete(f"/carts/me/items/{item.id}", headers=h)
+        r = await c.delete(f"/cart/items/{item.id}", headers=h)
         assert r.status_code == 200
         assert r.json()["lines"] == []

@@ -16,7 +16,7 @@ from app.modules.outbox.repository import OutboxRepository
 from app.modules.users.models import User
 
 
-router = APIRouter(prefix="/carts", tags=["carts"])
+router = APIRouter(prefix="/cart", tags=["cart"])
 
 
 def _service(session: AsyncSession) -> CartsService:
@@ -31,12 +31,17 @@ async def _cart_with_lines(session: AsyncSession, cart) -> CartOut:
     repo = CartsRepository(session)
     lines = await repo.list_lines(cart.id)
     return CartOut(
-        id=cart.id, status=cart.status.value, failure_reason=cart.failure_reason,
-        lines=[CartLineOut(item_id=l.item_id, quantity=l.quantity, unit_price_cents=l.unit_price_cents) for l in lines],
+        id=cart.id,
+        status=cart.status.value,
+        failure_reason=cart.failure_reason,
+        lines=[
+            CartLineOut(item_id=l.item_id, quantity=l.quantity, unit_price_cents=l.unit_price_cents)
+            for l in lines
+        ],
     )
 
 
-@router.get("/me", response_model=CartOut)
+@router.get("", response_model=CartOut)
 async def get_my_cart(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -46,18 +51,20 @@ async def get_my_cart(
     return await _cart_with_lines(session, cart)
 
 
-@router.post("/me/items", response_model=CartOut)
+@router.post("/items", response_model=CartOut)
 async def add_item(
     payload: AddItemIn,
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> CartOut:
-    cart, _ = await _service(session).add_item(user_id=user.id, item_id=payload.item_id, quantity=payload.quantity)
+    cart, _ = await _service(session).add_item(
+        user_id=user.id, item_id=payload.item_id, quantity=payload.quantity
+    )
     await session.commit()
     return await _cart_with_lines(session, cart)
 
 
-@router.delete("/me/items/{item_id}", response_model=CartOut)
+@router.delete("/items/{item_id}", response_model=CartOut)
 async def remove_item(
     item_id: uuid.UUID,
     user: Annotated[User, Depends(get_current_user)],
@@ -68,9 +75,8 @@ async def remove_item(
     return await _cart_with_lines(session, cart)
 
 
-@router.post("/{cart_id}/checkout", response_model=CheckoutOut, status_code=202)
+@router.post("/checkout", response_model=CheckoutOut, status_code=202)
 async def checkout(
-    cart_id: uuid.UUID,
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> CheckoutOut:
