@@ -1,4 +1,4 @@
-import uuid
+from datetime import datetime, timezone
 
 import pytest
 
@@ -15,7 +15,7 @@ async def test_store_and_find_refresh_token(db_session):
     await db_session.flush()
 
     repo = RefreshTokensRepository(db_session)
-    expires_at = "2030-01-01T00:00:00+00:00"
+    expires_at = datetime(2030, 1, 1, tzinfo=timezone.utc)
     rt = await repo.store(user_id=user.id, token_hash="hashed-jti", expires_at=expires_at)
     await db_session.commit()
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +13,9 @@ class RefreshTokensRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def store(self, *, user_id: uuid.UUID, token_hash: str, expires_at) -> RefreshToken:
-        if isinstance(expires_at, str):
-            expires_at = datetime.fromisoformat(expires_at)
+    async def store(
+        self, *, user_id: uuid.UUID, token_hash: str, expires_at: datetime
+    ) -> RefreshToken:
         rt = RefreshToken(user_id=user_id, token_hash=token_hash, expires_at=expires_at)
         self.session.add(rt)
         await self.session.flush()
@@ -30,7 +30,6 @@ class RefreshTokensRepository:
         return result.scalar_one_or_none()
 
     async def revoke(self, token_id: uuid.UUID) -> None:
-        from datetime import datetime, timezone
         await self.session.execute(
             update(RefreshToken)
             .where(RefreshToken.id == token_id)
