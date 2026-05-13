@@ -108,3 +108,14 @@ class CartsService:
                 details={"user_id": str(user_id)},
             )
         return cart_id
+
+    async def reopen_my_cart(self, *, user_id: uuid.UUID) -> Cart:
+        affected = await self.carts.reopen_failed_timeout(user_id)
+        if affected == 0:
+            raise NotFoundError(
+                "No reopenable cart found",
+                details={"user_id": str(user_id)},
+            )
+        cart = await self.carts.get_open_for_user(user_id)
+        assert cart is not None
+        return cart

@@ -93,3 +93,13 @@ async def cancel(
     cart_id = await _service(session).cancel_my_open_cart(user_id=user.id)
     await session.commit()
     return {"status": "cancelled", "cart_id": str(cart_id)}
+
+
+@router.post("/reopen", response_model=CartOut)
+async def reopen(
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> CartOut:
+    cart = await _service(session).reopen_my_cart(user_id=user.id)
+    await session.commit()
+    return await _cart_with_lines(session, cart)
