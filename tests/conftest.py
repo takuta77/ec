@@ -78,6 +78,10 @@ async def app_with_db(database_url, jwt_keys, monkeypatch):
     from app.core.config import get_settings
     get_settings.cache_clear()
 
+    # NOTE: Importing create_app forces registration of every module's
+    # ORM models onto Base.metadata via router imports. This MUST happen
+    # before Base.metadata.create_all so all tables get created.
+    from app.main import create_app
     from app.db.session import init_engine, dispose_engine
     from app.db.base import Base
     from sqlalchemy.ext.asyncio import create_async_engine
@@ -88,7 +92,6 @@ async def app_with_db(database_url, jwt_keys, monkeypatch):
     await e.dispose()
 
     init_engine()
-    from app.main import create_app
     app = create_app()
     yield app
     await dispose_engine()
