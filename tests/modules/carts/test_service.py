@@ -32,3 +32,31 @@ async def test_open_add_remove(db_session):
 
     with pytest.raises(NotFoundError):
         await svc.remove_item(user_id=u.id, item_id=i.id)
+
+
+async def test_submit_checkout_writes_outbox_and_marks_submitted(db_session):
+    from app.modules.outbox.repository import OutboxRepository
+    from app.modules.outbox.models import OutboxEvent
+    from sqlalchemy import select
+
+    users = UsersRepository(db_session)
+    items_repo = ItemsRepository(db_session)
+    u = await users.create(email="ch@example.com", hashed_password="h")
+    i = await items_repo.create(name="X", price_cents=200, currency="JPY")
+    await db_session.commit()
+
+    svc = CartsService(CartsRepository(db_session), items_repo, outbox=OutboxRepository(db_session))
+    await svc.add_item(user_id=u.id, item_id=i.id, quantity=3)
+    await db_session.commit()
+
+    result = await svc.submit_checkout(user_id=u.id, traceparent="00-aaaa-bbbb-01")
+    await db_session.commit()
+
+    assert result.checkout_request_id is not None
+    rows = (await db_session.execute(select(OutboxEvent))).scalars().all()
+    assert len(rows) == 1
+    ev = rows[0]
+    assert ev.event_type == "checkout.requested"
+    assert ev.payload["data"]["total_cents"] == 600
+    assert ev.payload["data"]["items"][0]["quantity"] == 3
+    assert ev.headers["traceparent"] == "00-aaaa-bbbb-01"
