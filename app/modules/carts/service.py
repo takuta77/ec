@@ -99,3 +99,12 @@ class CartsService:
             order_id=order_id,
             failure_reason=failure_reason,
         )
+
+    async def cancel_my_open_cart(self, *, user_id: uuid.UUID) -> uuid.UUID:
+        cart_id = await self.carts.cancel_open(user_id)
+        if cart_id is None:
+            raise NotFoundError(
+                "No open cart to cancel",
+                details={"user_id": str(user_id)},
+            )
+        return cart_id

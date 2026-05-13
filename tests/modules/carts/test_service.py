@@ -95,3 +95,38 @@ async def test_apply_order_created_transitions_only_from_submitted(db_session):
     )
     await db_session.commit()
     assert affected2 == 0
+
+
+async def test_cancel_open_cart(db_session):
+    from app.modules.carts.models import Cart, CartStatus
+    from sqlalchemy import select
+
+    u = await UsersRepository(db_session).create(email="ca@example.com", hashed_password="h")
+    await db_session.commit()
+    svc = CartsService(CartsRepository(db_session), ItemsRepository(db_session))
+    cart = await svc.open_or_get(u.id)
+    await db_session.commit()
+
+    cancelled_id = await svc.cancel_my_open_cart(user_id=u.id)
+    await db_session.commit()
+    assert cancelled_id == cart.id
+
+    row = (await db_session.execute(select(Cart).where(Cart.id == cart.id))).scalar_one()
+    assert row.status == CartStatus.cancelled
+
+    # After cancel, partial unique no longer blocks: new open cart can be created.
+    new_cart = await svc.open_or_get(u.id)
+    await db_session.commit()
+    assert new_cart.id != cart.id
+    assert new_cart.status == CartStatus.open
+
+
+async def test_cancel_returns_404_when_no_open(db_session):
+    from app.core.exceptions import NotFoundError
+
+    u = await UsersRepository(db_session).create(email="cnone@example.com", hashed_password="h")
+    await db_session.commit()
+    svc = CartsService(CartsRepository(db_session), ItemsRepository(db_session))
+
+    with pytest.raises(NotFoundError):
+        await svc.cancel_my_open_cart(user_id=u.id)

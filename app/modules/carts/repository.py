@@ -68,3 +68,13 @@ class CartsRepository:
         )
         result = await self.session.execute(stmt)
         return result.rowcount or 0
+
+    async def cancel_open(self, user_id: uuid.UUID) -> uuid.UUID | None:
+        stmt = (
+            update(Cart)
+            .where(Cart.user_id == user_id, Cart.status == CartStatus.open)
+            .values(status=CartStatus.cancelled)
+            .returning(Cart.id)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

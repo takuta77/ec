@@ -83,3 +83,13 @@ async def checkout(
     result = await _service(session).submit_checkout(user_id=user.id)
     await session.commit()
     return result
+
+
+@router.post("/cancel")
+async def cancel(
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> dict[str, str]:
+    cart_id = await _service(session).cancel_my_open_cart(user_id=user.id)
+    await session.commit()
+    return {"status": "cancelled", "cart_id": str(cart_id)}
