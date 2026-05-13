@@ -24,6 +24,7 @@ dependencies = [
     "opentelemetry-instrumentation-aio-pika>=0.50b0",
     "opentelemetry-instrumentation-httpx>=0.50b0",
     "opentelemetry-instrumentation-logging>=0.50b0",
+    "bcrypt<4.1",
 ]
 
 [build-system]
