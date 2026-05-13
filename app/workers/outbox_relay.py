@@ -42,6 +42,8 @@ async def relay_once(session: AsyncSession, connection: aio_pika.abc.AbstractRob
 
 async def run() -> None:
     settings = get_settings()
+    from app.core.telemetry import init_telemetry
+    init_telemetry(service_name="ec-outbox-relay")
     engine = build_engine(settings.database_url)
     factory = build_session_factory(engine)
     conn = await open_connection(settings.rabbitmq_url)

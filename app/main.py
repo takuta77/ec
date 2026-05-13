@@ -17,6 +17,11 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def _startup() -> None:
+        from app.core.logging import configure_structlog
+        from app.core.telemetry import init_telemetry, instrument_fastapi
+        configure_structlog()
+        init_telemetry(service_name="ec-api")
+        instrument_fastapi(app)
         init_engine()
 
     @app.on_event("shutdown")
