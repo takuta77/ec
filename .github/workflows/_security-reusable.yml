@@ -34,8 +34,13 @@ jobs:
           set -euo pipefail
           TODAY=$(date -u +%Y-%m-%d)
           export TODAY
+          # mikefarah/yq v4 evaluates "\(.x)" string interpolation once at root
+          # context even when the pipeline yields no items, producing a spurious
+          # " (expired )" line. String concatenation with `+` does not have that
+          # quirk. `| tostring` coerces dates so `+ ")"` is not parsed as a
+          # duration. See https://github.com/mikefarah/yq quirks.
           # shellcheck disable=SC2016
-          EXPIRED=$(yq '.ignores[] | select(.expires_at <= strenv(TODAY)) | "\(.vuln_id) (expired \(.expires_at))"' \
+          EXPIRED=$(yq '.ignores[] | select((.expires_at | tostring) <= strenv(TODAY)) | .vuln_id + " (expired " + (.expires_at | tostring) + ")"' \
             .security/pip-audit-ignore.yaml)
           if [ -n "$EXPIRED" ]; then
             echo "::error::Expired entries in .security/pip-audit-ignore.yaml:"
@@ -68,9 +73,11 @@ jobs:
       image: semgrep/semgrep:1.162.0
     steps:
       - uses: actions/checkout@v4
-      - name: Semgrep CI
+      - name: Semgrep scan
         run: |
-          semgrep ci \
+          # `semgrep scan` (not `semgrep ci`) accepts `--error` to fail on
+          # findings without requiring the Semgrep Cloud Platform token.
+          semgrep scan \
             --config p/python \
             --config p/security-audit \
             --config p/owasp-top-ten \

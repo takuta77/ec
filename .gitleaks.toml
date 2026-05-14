@@ -7,7 +7,9 @@ title = "EC API gitleaks config"
 [extend]
 useDefault = true
 
-[[rules.allowlist]]
+# Top-level allowlist applies to ALL rules. In gitleaks v8 this must be a
+# single TOML table (`[allowlist]`), not an array of tables (`[[...]]`).
+[allowlist]
 description = "Test JWT fixtures committed for unit tests"
 paths = [
   '''tests/fixtures/jwt_test_keys/.*\.pem$''',
