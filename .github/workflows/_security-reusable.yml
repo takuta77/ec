@@ -24,7 +24,9 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen
       - name: Export requirements from uv.lock
-        run: uv export --no-hashes --no-dev > /tmp/requirements.txt
+        # --no-emit-project drops the local `ec-api` package itself; otherwise
+        # pip-audit tries to look it up on PyPI and fails ("not found").
+        run: uv export --no-hashes --no-dev --no-emit-project > /tmp/requirements.txt
       - name: Build pip-audit args (apply allowlist + reject expired)
         id: audit-args
         # strenv(TODAY) reads the TODAY shell env var inside yq (mikefarah/yq v4 syntax).

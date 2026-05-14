@@ -60,7 +60,7 @@ uv run pytest -m slow         # requires Docker for Testcontainers
 
 ```bash
 # Python dependency vulnerabilities
-uv export --no-hashes --no-dev > /tmp/req.txt
+uv export --no-hashes --no-dev --no-emit-project > /tmp/req.txt
 uv run pip-audit -r /tmp/req.txt
 
 # SAST
