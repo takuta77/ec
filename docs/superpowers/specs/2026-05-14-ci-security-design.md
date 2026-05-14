@@ -279,16 +279,22 @@ CI/CD 自体には自動テストを書きづらいので、以下で検証す�
 4. 1 週間運用観察。 `image` / `dockerfile` / `iac` のノイズを評価し、必要なら必須化判断
 5. 開発者向けに「CI/Security 失敗時のフロー」ドキュメントを README に追記
 
-## 14. オープン項目 (将来検討)
+## 14. オープン項目
 
-### 直近で必要な follow-up
+### 完了済み
 
-- **コードベース cleanup PR (高優先)** — 既存の ruff / format / mypy strict 違反を解消し、`ci / lint` と `ci / type` を required check に昇格させる。具体的に対応するもの:
-  - **Ruff lint**: `pydantic.Field`, `mapped_column`, `Mapped`, `pytest` x2, `asyncio` の未使用 import 削除、`carts/router.py` の ambiguous 変数 `l` リネーム
-  - **Ruff format**: 38 ファイルを `uv run ruff format` で自動整形
-  - **Mypy strict**: `types-passlib` 追加、`python-jose` のスタブ整備、`app/core/security.py` の `no-any-return`、`app/modules/*/repository.py` の `Result[Any].rowcount` typing、`app/modules/items/router.py` の return type / bare `list`、`auth/dependencies.py` の `no_implicit_optional` 等を一括修正
-  - 完了後に README のブランチ保護手順を更新し、両 check を required に追加
-- 既存 `feature/ec-api-impl` の `Makefile` 削除 (本 spec は新規追加しないだけ。retroactive 削除は別 PR で対応)
+- ~~コードベース cleanup PR (PR #4 でマージ済)~~
+- ~~既存 `Makefile` 削除 (PR #16)~~
+- ~~Semgrep container image 用 Dependabot ターゲット (`.github/workflows`, PR #16)~~
+- ~~Action SHA-pinning (本 PR)~~
+
+### 直近で必要な follow-up (validation で発見)
+
+- **SAST 検出範囲のギャップ** — Validation PR #17 で `os.system(user_input)` が 4 つの ruleset (`p/python`, `p/security-audit`, `p/owasp-top-ten`, `p/jwt`) いずれにもヒットせず `Findings: 0` だった。`python.lang.security.audit.dangerous-system-call` ルールが Semgrep Pro 限定の可能性。対応案:
+  - (a) Semgrep の rule registry を追加で読み込む (`--config r/python.lang.security.audit.dangerous-system-call`)
+  - (b) リポジトリ局所のカスタムルールを `.semgrep/` ディレクトリに追加して `--config .semgrep/`
+  - (c) Bandit を追加併用 (`bandit -r app/`) — Python 特化 SAST
+- **Gitleaks fixture 検証メモ** — fake AWS key を作る際は `AKIA[A-Z0-9]{16}\b` の境界条件 (16 文字ちょうど) を守る必要あり (例: `AKIAIOSFODNN7EXAMPLE` は OK)。31 文字続けると regex に外れる。本ファイル §12 のテスト手順に注記すべき。
 
 ### 将来検討
 
@@ -300,5 +306,3 @@ CI/CD 自体には自動テストを書きづらいので、以下で検証す�
 - SLSA Level 2 / 3 対応 (build provenance)
 - 署名付きコンテナイメージ (cosign)
 - ショートカット用 `poethepoet` 導入 (`poe ci`, `poe dev` 等)
-- Action SHA-pinning (現状 mutable major tag、Dependabot 更新)
-- Semgrep container image を GitHub Actions の `container:` 用に Dependabot ターゲット追加 (`.github/workflows` ディレクトリ用エントリ)
