@@ -28,6 +28,10 @@ class ConflictError(AppError):
     http_status = 409
 
 
+class OpenCartAlreadyExistsError(ConflictError):
+    code = "open_cart_already_exists"
+
+
 class ValidationError(AppError):
     code = "validation_error"
     http_status = 422

@@ -4,7 +4,17 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import (
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,6 +26,7 @@ class CartStatus(str, enum.Enum):
     submitted = "submitted"
     ordered = "ordered"
     failed = "failed"
+    cancelled = "cancelled"
 
 
 class Cart(Base):
@@ -37,6 +48,21 @@ class Cart(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_carts_user_open",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status = 'open'"),
+        ),
+        Index(
+            "uq_carts_checkout_request_id",
+            "checkout_request_id",
+            unique=True,
+            postgresql_where=text("checkout_request_id IS NOT NULL"),
+        ),
     )
 
 

@@ -1,0 +1,189 @@
+name: _security-reusable
+
+on:
+  workflow_call:
+    inputs:
+      secrets-full-history:
+        description: "If true, gitleaks scans full git history (used by nightly). If false, scan diff only."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  security-events: write   # required for SARIF upload
+
+jobs:
+  deps:
+    name: deps (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Export requirements from uv.lock
+        # --no-emit-project drops the local `ec-api` package itself; otherwise
+        # pip-audit tries to look it up on PyPI and fails ("not found").
+        run: uv export --no-hashes --no-dev --no-emit-project > /tmp/requirements.txt
+      - name: Build pip-audit args (apply allowlist + reject expired)
+        id: audit-args
+        # strenv(TODAY) reads the TODAY shell env var inside yq (mikefarah/yq v4 syntax).
+        # SC2016 ("expressions don't expand in single quotes") is a false positive here.
+        shell: bash
+        run: |
+          set -euo pipefail
+          TODAY=$(date -u +%Y-%m-%d)
+          export TODAY
+          # mikefarah/yq v4 evaluates "\(.x)" string interpolation once at root
+          # context even when the pipeline yields no items, producing a spurious
+          # " (expired )" line. String concatenation with `+` does not have that
+          # quirk. `| tostring` coerces dates so `+ ")"` is not parsed as a
+          # duration. See https://github.com/mikefarah/yq quirks.
+          # shellcheck disable=SC2016
+          EXPIRED=$(yq '.ignores[] | select((.expires_at | tostring) <= strenv(TODAY)) | .vuln_id + " (expired " + (.expires_at | tostring) + ")"' \
+            .security/pip-audit-ignore.yaml)
+          if [ -n "$EXPIRED" ]; then
+            echo "::error::Expired entries in .security/pip-audit-ignore.yaml:"
+            echo "$EXPIRED"
+            exit 1
+          fi
+          IGNORE_ARGS=""
+          while IFS= read -r vid; do
+            [ -n "$vid" ] && IGNORE_ARGS="$IGNORE_ARGS --ignore-vuln $vid"
+          done < <(yq '.ignores[].vuln_id | select(. != null)' .security/pip-audit-ignore.yaml)
+          echo "args=$IGNORE_ARGS" >> "$GITHUB_OUTPUT"
+      - name: Run pip-audit
+        # pip-audit 2.10 does not support `--format sarif` (only columns/json/
+        # markdown/cyclonedx-*). Job pass/fail (the required check) plus the
+        # human-readable columns output in the log are sufficient; promoting to
+        # Code Scanning SARIF is a follow-up when pip-audit 3.x ships SARIF.
+        run: |
+          uv run pip-audit \
+            --requirement /tmp/requirements.txt \
+            --strict \
+            --format columns \
+            ${{ steps.audit-args.outputs.args }}
+
+  sast:
+    name: sast (semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:1.162.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep scan
+        run: |
+          # `semgrep scan` (not `semgrep ci`) accepts `--error` to fail on
+          # findings without requiring the Semgrep Cloud Platform token.
+          semgrep scan \
+            --config p/python \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --config p/jwt \
+            --sarif --output semgrep.sarif \
+            --error
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  secrets:
+    name: secrets (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks-action computes a PR-range diff (base^..head) and needs
+          # both refs locally. A shallow clone makes the base parent missing
+          # and the scan errors out with "ambiguous argument <sha>^..<sha>".
+          # Always fetch full history; the repo is small and the cost is
+          # negligible.
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
+          GITLEAKS_ENABLE_SUMMARY: "true"
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: results.sarif
+          category: gitleaks
+
+  image:
+    name: image (trivy)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f docker/Dockerfile -t ec-api:ci .
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ec-api:ci
+          format: sarif
+          output: trivy-image.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "0"   # warn-only for now
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy
+
+  dockerfile:
+    name: dockerfile (hadolint)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: docker/Dockerfile
+          format: sarif
+          output-file: hadolint.sarif
+          no-fail: true   # warn-only
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: hadolint.sarif
+          category: hadolint
+
+  iac:
+    name: iac (checkov)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          file: docker-compose.yml
+          output_format: sarif
+          output_file_path: ./checkov.sarif
+          soft_fail: true   # warn-only
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov.sarif/results_sarif.sarif
+          category: checkov
+
+  sbom:
+    name: sbom (syft)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          artifact-name: sbom-cyclonedx.json
+          output-file: sbom-cyclonedx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom-cyclonedx.json
+          retention-days: 90

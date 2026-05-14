@@ -68,3 +68,30 @@ async def test_skips_terminal_carts(db_session):
     count = await sweep_once(db_session, timeout_hours=24)
     await db_session.commit()
     assert count == 0
+
+
+async def test_reopened_cart_is_not_swept_again(db_session):
+    from app.modules.carts.service import CartsService
+    from app.modules.outbox.repository import OutboxRepository
+
+    crid = await _setup_submitted(db_session, age_hours=30)
+    count = await sweep_once(db_session, timeout_hours=24)
+    await db_session.commit()
+    assert count == 1
+
+    # Reopen
+    cart = (
+        await db_session.execute(select(Cart).where(Cart.checkout_request_id == crid))
+    ).scalar_one()
+    svc = CartsService(
+        CartsRepository(db_session),
+        ItemsRepository(db_session),
+        outbox=OutboxRepository(db_session),
+    )
+    await svc.reopen_my_cart(user_id=cart.user_id)
+    await db_session.commit()
+
+    # Subsequent sweep finds 0 carts to time out
+    count2 = await sweep_once(db_session, timeout_hours=24)
+    await db_session.commit()
+    assert count2 == 0

@@ -1,0 +1,17 @@
+# .gitleaks.toml
+# Allowlist for known-safe matches. Keep this minimal —
+# real secrets must be removed, rotated, and not allowlisted.
+
+title = "EC API gitleaks config"
+
+[extend]
+useDefault = true
+
+# Top-level allowlist applies to ALL rules. In gitleaks v8 this must be a
+# single TOML table (`[allowlist]`), not an array of tables (`[[...]]`).
+[allowlist]
+description = "Test JWT fixtures committed for unit tests"
+paths = [
+  '''tests/fixtures/jwt_test_keys/.*\.pem$''',
+  '''tests/fixtures/jwt_test_keys/.*\.json$''',
+]

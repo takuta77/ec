@@ -1,0 +1,46 @@
+name: nightly-security
+
+on:
+  schedule:
+    - cron: "0 18 * * *"   # 18:00 UTC = 03:00 JST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+
+concurrency:
+  group: nightly-security
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    uses: ./.github/workflows/_security-reusable.yml
+    secrets: inherit
+    with:
+      secrets-full-history: true
+
+  notify-on-failure:
+    needs: scan
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure labels exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create security --color "e11d48" --description "Security related" --force || true
+          gh label create nightly --color "7c3aed" --description "Nightly automated run" --force || true
+      - name: Open issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh issue create \
+            --title "[security] nightly scan failure $DATE" \
+            --label security \
+            --label nightly \
+            --body "Nightly security scan failed. See run: $RUN_URL"
