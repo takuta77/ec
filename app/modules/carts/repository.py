@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any, cast
 
 from sqlalchemy import select, delete, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.carts.models import Cart, CartItem, CartStatus
@@ -51,7 +53,7 @@ class CartsRepository:
         result = await self.session.execute(
             delete(CartItem).where(CartItem.cart_id == cart_id, CartItem.item_id == item_id)
         )
-        return result.rowcount or 0
+        return cast(CursorResult[Any], result).rowcount or 0
 
     async def list_lines(self, cart_id: uuid.UUID) -> list[CartItem]:
         result = await self.session.execute(select(CartItem).where(CartItem.cart_id == cart_id))
@@ -73,4 +75,4 @@ class CartsRepository:
             .values(status=new_status, order_id=order_id, failure_reason=failure_reason)
         )
         result = await self.session.execute(stmt)
-        return result.rowcount or 0
+        return cast(CursorResult[Any], result).rowcount or 0

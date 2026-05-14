@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 
 from sqlalchemy import select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -31,7 +33,7 @@ async def sweep_once(session: AsyncSession, *, timeout_hours: int, limit: int = 
         .where(Cart.id.in_(ids), Cart.status == CartStatus.submitted)
         .values(status=CartStatus.failed, failure_reason="timeout")
     )
-    return result.rowcount or 0
+    return cast(CursorResult[Any], result).rowcount or 0
 
 
 async def run() -> None:
