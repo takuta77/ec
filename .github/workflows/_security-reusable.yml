@@ -101,3 +101,60 @@ jobs:
         with:
           sarif_file: results.sarif
           category: gitleaks
+
+  image:
+    name: image (trivy)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f docker/Dockerfile -t ec-api:ci .
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ec-api:ci
+          format: sarif
+          output: trivy-image.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "0"   # warn-only for now
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy
+
+  dockerfile:
+    name: dockerfile (hadolint)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: docker/Dockerfile
+          format: sarif
+          output-file: hadolint.sarif
+          no-fail: true   # warn-only
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: hadolint.sarif
+          category: hadolint
+
+  iac:
+    name: iac (checkov)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          file: docker-compose.yml
+          output_format: sarif
+          output_file_path: ./checkov.sarif
+          soft_fail: true   # warn-only
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov.sarif/results_sarif.sarif
+          category: checkov
