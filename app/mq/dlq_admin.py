@@ -63,6 +63,41 @@ class DrainResult:
     drained: int
 
 
+def _body_preview(body: bytes, preview_chars: int) -> str:
+    try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return repr(body)[:preview_chars]
+    return text[:preview_chars]
+
+
+def _extract_routing_key(headers: dict[str, Any]) -> str | None:
+    x_death = headers.get("x-death")
+    if not isinstance(x_death, list) or not x_death:
+        return None
+    first = x_death[0]
+    if not isinstance(first, dict):
+        return None
+    rks = first.get("routing-keys")
+    if not isinstance(rks, list) or not rks:
+        return None
+    first_rk = rks[0]
+    return first_rk if isinstance(first_rk, str) else None
+
+
+def _extract_death_count(headers: dict[str, Any]) -> int:
+    x_death = headers.get("x-death")
+    if isinstance(x_death, list) and x_death:
+        first = x_death[0]
+        if isinstance(first, dict):
+            count = first.get("count", 0)
+            if isinstance(count, int):
+                return count
+    # Fallback: flat header set by test helpers or custom publishers
+    flat = headers.get("x-death-count", 0)
+    return flat if isinstance(flat, int) else 0
+
+
 async def count_dlq(
     *,
     connection: aio_pika.abc.AbstractRobustConnection,
@@ -93,7 +128,57 @@ async def peek_dlq(
     preview_chars: int = 200,
 ) -> list[DLQMessage]:
     """Return up to `limit` messages without consuming them."""
-    raise NotImplementedError
+    dlq_name = f"{queue}.dlq"
+    chan = await connection.channel()
+    await chan.set_qos(prefetch_count=limit)
+    try:
+        try:
+            dlq = await chan.declare_queue(dlq_name, passive=True)
+        except aio_pika.exceptions.ChannelClosed as exc:
+            raise DLQNotFoundError(f"queue {dlq_name} does not exist") from exc
+
+        result: list[DLQMessage] = []
+        pending: list[aio_pika.abc.AbstractIncomingMessage] = []
+        seen_ids: set[str | None] = set()
+
+        async with dlq.iterator(no_ack=False, timeout=2.0) as q_iter:
+            try:
+                async for message in q_iter:
+                    # Stop on re-delivery of an already-seen message to avoid cycles
+                    if message.message_id in seen_ids:
+                        await message.nack(requeue=True)
+                        break
+                    seen_ids.add(message.message_id)
+                    headers = dict(message.headers or {})
+                    rk = _extract_routing_key(headers) or message.routing_key
+                    result.append(
+                        DLQMessage(
+                            delivery_tag=message.delivery_tag or 0,
+                            event_id=message.message_id,
+                            routing_key=rk,
+                            death_count=_extract_death_count(headers),
+                            body_preview=_body_preview(message.body, preview_chars),
+                            headers=headers,
+                        )
+                    )
+                    pending.append(message)
+                    if len(result) >= limit:
+                        break
+            except TimeoutError:
+                pass
+
+        # Nack all collected messages after iterator is closed (outside consumer scope)
+        for msg in pending:
+            try:
+                await msg.nack(requeue=True)
+            except Exception:  # noqa: BLE001
+                pass
+
+        _logger.info("dlq_admin.peek", queue=dlq_name, count=len(result))
+        return result
+    finally:
+        if not chan.is_closed:
+            await chan.close()
 
 
 async def redrive_dlq(
