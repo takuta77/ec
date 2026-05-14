@@ -158,3 +158,20 @@ jobs:
         with:
           sarif_file: checkov.sarif/results_sarif.sarif
           category: checkov
+
+  sbom:
+    name: sbom (syft)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          artifact-name: sbom-cyclonedx.json
+          output-file: sbom-cyclonedx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom-cyclonedx.json
+          retention-days: 90
