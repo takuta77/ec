@@ -4,6 +4,7 @@ Revision ID: 0005
 Revises: 0004
 Create Date: 2026-05-13
 """
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -23,7 +24,9 @@ def upgrade() -> None:
         sa.Column("event_type", sa.String(100), nullable=False),
         sa.Column("payload", JSONB, nullable=False),
         sa.Column("headers", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
         sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("attempts", sa.Integer, nullable=False, server_default=sa.text("0")),
         sa.Column("dead_letter_at", sa.DateTime(timezone=True), nullable=True),

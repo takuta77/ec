@@ -12,7 +12,9 @@ class ItemsRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def create(self, *, name: str, price_cents: int, currency: str, description: str | None = None) -> Item:
+    async def create(
+        self, *, name: str, price_cents: int, currency: str, description: str | None = None
+    ) -> Item:
         item = Item(name=name, description=description, price_cents=price_cents, currency=currency)
         self.session.add(item)
         await self.session.flush()
@@ -22,6 +24,12 @@ class ItemsRepository:
         return await self.session.get(Item, item_id)
 
     async def list_active(self, *, limit: int, offset: int) -> list[Item]:
-        stmt = select(Item).where(Item.is_active.is_(True)).order_by(Item.created_at.desc()).limit(limit).offset(offset)
+        stmt = (
+            select(Item)
+            .where(Item.is_active.is_(True))
+            .order_by(Item.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())

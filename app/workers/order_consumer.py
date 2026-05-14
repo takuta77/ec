@@ -56,6 +56,7 @@ async def handle_event(session: AsyncSession, envelope: dict[str, Any]) -> None:
 async def run() -> None:
     settings = get_settings()
     from app.core.telemetry import init_telemetry
+
     init_telemetry(service_name="ec-order-consumer")
     engine = build_engine(settings.database_url)
     factory = build_session_factory(engine)

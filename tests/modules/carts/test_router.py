@@ -13,6 +13,7 @@ async def _auth(c):
 
 async def test_open_cart_and_add_remove(app_with_db, db_session):
     from app.modules.items.repository import ItemsRepository
+
     item = await ItemsRepository(db_session).create(name="T", price_cents=100, currency="JPY")
     await db_session.commit()
 
@@ -21,7 +22,9 @@ async def test_open_cart_and_add_remove(app_with_db, db_session):
         r = await c.get("/carts/me", headers=h)
         assert r.status_code == 200 and r.json()["status"] == "open"
 
-        r = await c.post("/carts/me/items", json={"item_id": str(item.id), "quantity": 2}, headers=h)
+        r = await c.post(
+            "/carts/me/items", json={"item_id": str(item.id), "quantity": 2}, headers=h
+        )
         assert r.status_code == 200
         assert r.json()["lines"][0]["quantity"] == 2
 

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
+from app.modules.items.models import Item
 from app.modules.items.repository import ItemsRepository
 from app.modules.items.schemas import ItemOut
 from app.modules.items.service import ItemsService
@@ -24,7 +25,7 @@ async def list_items(
     session: Annotated[AsyncSession, Depends(get_session)],
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-) -> list:
+) -> list[Item]:
     return await _service(session).list_active(limit=limit, offset=offset)
 
 
@@ -32,5 +33,5 @@ async def list_items(
 async def get_item(
     item_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_session)],
-):
+) -> Item:
     return await _service(session).get(item_id)

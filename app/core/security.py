@@ -33,7 +33,9 @@ def create_access_token(*, subject: str, private_key: str, ttl_min: int) -> str:
     return jwt.encode(payload, private_key, algorithm="RS256")
 
 
-def create_refresh_token(*, subject: str, private_key: str, ttl_days: int, jti: str | None = None) -> str:
+def create_refresh_token(
+    *, subject: str, private_key: str, ttl_days: int, jti: str | None = None
+) -> str:
     payload: dict[str, Any] = {
         "sub": subject,
         "typ": "refresh",

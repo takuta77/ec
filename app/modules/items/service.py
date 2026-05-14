@@ -11,8 +11,12 @@ class ItemsService:
     def __init__(self, items: ItemsRepository) -> None:
         self.items = items
 
-    async def create(self, *, name: str, price_cents: int, currency: str, description: str | None = None) -> Item:
-        return await self.items.create(name=name, price_cents=price_cents, currency=currency, description=description)
+    async def create(
+        self, *, name: str, price_cents: int, currency: str, description: str | None = None
+    ) -> Item:
+        return await self.items.create(
+            name=name, price_cents=price_cents, currency=currency, description=description
+        )
 
     async def get(self, item_id: uuid.UUID) -> Item:
         i = await self.items.find_by_id(item_id)

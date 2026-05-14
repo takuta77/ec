@@ -16,8 +16,8 @@ from app.modules.users.repository import UsersRepository
 
 
 async def get_current_user(
+    session: Annotated[AsyncSession, Depends(get_session)],
     authorization: Annotated[str | None, Header()] = None,
-    session: Annotated[AsyncSession, Depends(get_session)] = None,
 ) -> User:
     if not authorization or not authorization.startswith("Bearer "):
         raise AuthError("Missing bearer token")

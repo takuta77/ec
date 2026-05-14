@@ -22,6 +22,8 @@ class Publisher:
             await self.declare()
         assert self._exchange is not None
         await self._exchange.publish(
-            aio_pika.Message(body=body, headers=headers, delivery_mode=aio_pika.DeliveryMode.PERSISTENT),
+            aio_pika.Message(
+                body=body, headers=headers, delivery_mode=aio_pika.DeliveryMode.PERSISTENT
+            ),
             routing_key=routing_key,
         )

@@ -54,7 +54,9 @@ class OutboxRepository:
 
     async def bump_attempts(self, event_id: uuid.UUID) -> None:
         await self.session.execute(
-            update(OutboxEvent).where(OutboxEvent.id == event_id).values(attempts=OutboxEvent.attempts + 1)
+            update(OutboxEvent)
+            .where(OutboxEvent.id == event_id)
+            .values(attempts=OutboxEvent.attempts + 1)
         )
 
     async def mark_dead_letter(self, event_id: uuid.UUID) -> None:

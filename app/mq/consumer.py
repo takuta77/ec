@@ -13,7 +13,14 @@ from app.mq.retry import RETRY_BACKOFF_MS, RETRY_EXCHANGE
 
 logger = logging.getLogger(__name__)
 
-RETRYABLE_EXCEPTIONS = (OperationalError, DBAPIError, DisconnectionError, ConnectionError, TimeoutError, OSError)
+RETRYABLE_EXCEPTIONS = (
+    OperationalError,
+    DBAPIError,
+    DisconnectionError,
+    ConnectionError,
+    TimeoutError,
+    OSError,
+)
 
 
 @dataclass
@@ -65,7 +72,9 @@ class Consumer:
 
         async with queue.iterator() as it:
             async for message in it:
-                async with message.process(ignore_processed=True, requeue=False, reject_on_redelivered=False):
+                async with message.process(
+                    ignore_processed=True, requeue=False, reject_on_redelivered=False
+                ):
                     try:
                         envelope = Envelope.parse(message.body, dict(message.headers or {}))
                     except Exception as exc:  # parse / schema error
@@ -73,7 +82,12 @@ class Consumer:
                         await message.reject(requeue=False)
                         if self.on_dlq:
                             await self.on_dlq(
-                                Envelope(event_id="-", event_type="-", data={}, raw_headers=dict(message.headers or {})),
+                                Envelope(
+                                    event_id="-",
+                                    event_type="-",
+                                    data={},
+                                    raw_headers=dict(message.headers or {}),
+                                ),
                                 "parse_error",
                             )
                         continue

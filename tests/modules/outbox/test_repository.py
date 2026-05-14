@@ -10,9 +10,11 @@ pytestmark = [pytest.mark.slow, pytest.mark.asyncio]
 async def test_append_fetch_mark(db_session):
     repo = OutboxRepository(db_session)
     row = await repo.append(
-        aggregate_type="cart", aggregate_id=uuid.uuid4(),
+        aggregate_type="cart",
+        aggregate_id=uuid.uuid4(),
         event_type="checkout.requested",
-        payload={"hello": "world"}, headers={"traceparent": "tp"},
+        payload={"hello": "world"},
+        headers={"traceparent": "tp"},
     )
     await db_session.commit()
 
@@ -27,8 +29,13 @@ async def test_append_fetch_mark(db_session):
 
 async def test_bump_attempts_and_dead_letter(db_session):
     repo = OutboxRepository(db_session)
-    row = await repo.append(aggregate_type="cart", aggregate_id=uuid.uuid4(),
-                            event_type="checkout.requested", payload={}, headers={})
+    row = await repo.append(
+        aggregate_type="cart",
+        aggregate_id=uuid.uuid4(),
+        event_type="checkout.requested",
+        payload={},
+        headers={},
+    )
     await db_session.commit()
     for _ in range(8):
         await repo.bump_attempts(row.id)
@@ -41,6 +48,7 @@ async def test_bump_attempts_and_dead_letter(db_session):
 
 async def test_processed_events_try_insert(db_session):
     from app.modules.outbox.processed import ProcessedEventsRepository
+
     repo = ProcessedEventsRepository(db_session)
     eid = uuid.uuid4()
     assert await repo.try_insert(eid, "order.created") is True

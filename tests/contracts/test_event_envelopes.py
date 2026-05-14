@@ -2,7 +2,6 @@ import json
 import uuid
 from pathlib import Path
 
-import pytest
 from jsonschema import Draft202012Validator
 
 
@@ -20,8 +19,12 @@ def test_checkout_requested_envelope_matches_schema():
 
     cart = Cart(id=uuid.uuid4(), user_id=uuid.uuid4(), status=CartStatus.submitted)
     item = Item(id=uuid.uuid4(), name="x", price_cents=100, currency="JPY", is_active=True)
-    line = CartItem(id=uuid.uuid4(), cart_id=cart.id, item_id=item.id, quantity=2, unit_price_cents=100)
-    envelope = build_checkout_requested(cart=cart, lines=[(line, item)], checkout_request_id=uuid.uuid4())
+    line = CartItem(
+        id=uuid.uuid4(), cart_id=cart.id, item_id=item.id, quantity=2, unit_price_cents=100
+    )
+    envelope = build_checkout_requested(
+        cart=cart, lines=[(line, item)], checkout_request_id=uuid.uuid4()
+    )
     _load("checkout.requested.schema.json").validate(envelope)
 
 
