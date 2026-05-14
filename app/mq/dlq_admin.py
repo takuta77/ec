@@ -69,7 +69,20 @@ async def count_dlq(
     queue: str,
 ) -> CountResult:
     """Return the message count of `<queue>.dlq` via passive declare."""
-    raise NotImplementedError
+    dlq_name = f"{queue}.dlq"
+    chan = await connection.channel()
+    try:
+        try:
+            declared = await chan.declare_queue(dlq_name, passive=True)
+        except aio_pika.exceptions.ChannelClosed as exc:
+            raise DLQNotFoundError(f"queue {dlq_name} does not exist") from exc
+        return CountResult(
+            queue=dlq_name,
+            message_count=declared.declaration_result.message_count or 0,
+        )
+    finally:
+        if not chan.is_closed:
+            await chan.close()
 
 
 async def peek_dlq(
