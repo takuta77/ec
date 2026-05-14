@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["event_id", "event_type", "data"],
+  "properties": {
+    "event_id": {"type": "string", "format": "uuid"},
+    "event_type": {"const": "order.created"},
+    "data": {
+      "type": "object",
+      "required": ["checkout_request_id", "order_id", "status", "confirmed_at"],
+      "properties": {
+        "checkout_request_id": {"type": "string", "format": "uuid"},
+        "order_id": {"type": "string", "format": "uuid"},
+        "status": {"type": "string"},
+        "confirmed_at": {"type": "string"}
+      }
+    }
+  }
+}

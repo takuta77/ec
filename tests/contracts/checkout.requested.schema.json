@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["event_id", "event_type", "occurred_at", "data"],
+  "properties": {
+    "event_id": {"type": "string", "format": "uuid"},
+    "event_type": {"const": "checkout.requested"},
+    "occurred_at": {"type": "string"},
+    "data": {
+      "type": "object",
+      "required": ["checkout_request_id", "user_id", "cart_id", "items", "total_cents", "currency"],
+      "properties": {
+        "checkout_request_id": {"type": "string", "format": "uuid"},
+        "user_id": {"type": "string", "format": "uuid"},
+        "cart_id": {"type": "string", "format": "uuid"},
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["item_id", "name", "quantity", "unit_price_cents", "currency"],
+            "properties": {
+              "item_id": {"type": "string", "format": "uuid"},
+              "name": {"type": "string"},
+              "quantity": {"type": "integer", "minimum": 1},
+              "unit_price_cents": {"type": "integer", "minimum": 0},
+              "currency": {"type": "string", "minLength": 3, "maxLength": 3}
+            }
+          }
+        },
+        "total_cents": {"type": "integer", "minimum": 0},
+        "currency": {"type": "string", "minLength": 3, "maxLength": 3}
+      }
+    }
+  }
+}
