@@ -105,7 +105,7 @@ README.md                         # 「ローカルでの再現」と「ブラ�
 
 | job_id        | ツール                | 入力                              | 失敗条件                                   | SARIF |
 |---------------|-----------------------|-----------------------------------|--------------------------------------------|-------|
-| `deps`        | pip-audit             | `uv export --no-hashes` の出力     | `HIGH`/`CRITICAL` の CVE                   | yes   |
+| `deps`        | pip-audit             | `uv export --no-hashes` の出力     | `HIGH`/`CRITICAL` の CVE                   | no¹   |
 | `sast`        | Semgrep CI            | `p/python` + `p/security-audit` + `p/owasp-top-ten` + `p/jwt` | severity `ERROR` 検出 | yes   |
 | `secrets`     | gitleaks              | PR 時は `git diff`、nightly は full history | いかなる検知 (allowlist 適用後) | yes   |
 | `image`       | Trivy (image)         | `docker build` で作る `ec-api:ci` | `HIGH`/`CRITICAL` の脆弱性                  | yes   |
@@ -114,6 +114,7 @@ README.md                         # 「ローカルでの再現」と「ブラ�
 | `sbom`        | Syft                  | リポジトリ全体                     | (常に成功)                                  | no — artifact |
 
 - SARIF は `github/codeql-action/upload-sarif@v3` で Code Scanning にアップロード
+- ¹ `pip-audit` 2.10 は `--format sarif` 未対応 (columns/json/markdown/cyclonedx-*)。job exit code で PR ブロックし、検出内容はログ参照。pip-audit 3.x で SARIF 出力が出たら follow-up で有効化
 - SBOM は CycloneDX JSON 形式で artifact (リテンション 90 日)
 - 必須 = `deps`, `sast`, `secrets`。`image`, `dockerfile`, `iac` は **warn-only** (現状の Dockerfile/compose にどれくらい指摘が出るか未知のため、最初は警告のみで運用 → 安定後に必須化)
 - `sbom` は常に成功 (証跡保管用)
