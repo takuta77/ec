@@ -30,3 +30,11 @@ updates:
     labels:
       - "dependencies"
       - "docker"
+
+  - package-ecosystem: "docker"
+    directory: "/.github/workflows"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "github-actions-docker"

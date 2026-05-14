@@ -8,16 +8,16 @@ See `docs/superpowers/specs/2026-05-12-ec-api-design.md` for the design and `doc
 uv sync
 ./scripts/gen_jwt_keys.sh
 cp .env.example .env             # set NEW_RELIC_LICENSE_KEY
-make up
-make migrate
+docker compose up -d --build
+docker compose exec api alembic upgrade head
 open http://localhost:8000/docs
 ```
 
 ## Tests
 
 ```bash
-make test         # pure unit tests
-make test-slow    # integration / workers / contracts (Docker required)
+uv run pytest -m "not slow"        # pure unit tests
+uv run pytest -m slow              # integration / workers / contracts (Docker required)
 ```
 
 ## Layout
