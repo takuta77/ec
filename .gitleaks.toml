@@ -1,0 +1,15 @@
+# .gitleaks.toml
+# Allowlist for known-safe matches. Keep this minimal —
+# real secrets must be removed, rotated, and not allowlisted.
+
+title = "EC API gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules.allowlist]]
+description = "Test JWT fixtures committed for unit tests"
+paths = [
+  '''tests/fixtures/jwt_test_keys/.*\.pem$''',
+  '''tests/fixtures/jwt_test_keys/.*\.json$''',
+]
