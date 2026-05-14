@@ -109,7 +109,7 @@ README.md                         # 「ローカルでの再現」と「ブラ�
 | `sast`        | Semgrep CI            | `p/python` + `p/security-audit` + `p/owasp-top-ten` + `p/jwt` | severity `ERROR` 検出 | yes   |
 | `secrets`     | gitleaks              | PR 時は `git diff`、nightly は full history | いかなる検知 (allowlist 適用後) | yes   |
 | `image`       | Trivy (image)         | `docker build` で作る `ec-api:ci` | `HIGH`/`CRITICAL` の脆弱性                  | yes   |
-| `dockerfile`  | hadolint              | `docker/Dockerfile.*` 全て         | severity `error` 以上                       | yes   |
+| `dockerfile`  | hadolint              | `docker/Dockerfile`                | severity `error` 以上                       | yes   |
 | `iac`         | Checkov               | `docker-compose.yml`              | severity `HIGH` 以上                        | yes   |
 | `sbom`        | Syft                  | リポジトリ全体                     | (常に成功)                                  | no — artifact |
 
@@ -222,10 +222,10 @@ uv run semgrep ci \
 gitleaks detect --redact --no-banner
 
 # Dockerfile lint
-docker run --rm -i hadolint/hadolint < docker/Dockerfile.api
+docker run --rm -i hadolint/hadolint < docker/Dockerfile
 
 # Container image スキャン
-docker build -f docker/Dockerfile.api -t ec-api:dev .
+docker build -f docker/Dockerfile -t ec-api:dev .
 trivy image --severity HIGH,CRITICAL ec-api:dev
 ```
 
