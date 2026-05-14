@@ -69,7 +69,6 @@ JST            │                                                            �
 .security/
 └── pip-audit-ignore.yaml         # 既知だが未修正の CVE と期限・理由
 README.md                         # 「ローカルでの再現」と「ブランチ保護設定手順」セクション追加
-Makefile                          # `make ci`, `make security` ターゲット追加
 ```
 
 ## 5. CI ワークフロー (`ci.yml`)
@@ -179,49 +178,68 @@ updates:
 
 README に GitHub UI でのスクリーンショット手順を記載。Terraform / `gh api` での自動化は対象外。
 
-## 9. ローカル再現 (`make ci`, `make security`)
+## 9. ローカル再現 (README に手順を集約)
 
-開発者が PR 作成前に同等チェックを回せるよう Makefile を整備:
+Makefile / タスクランナーは導入せず、FastAPI / uv のネイティブコマンドを README に列挙する。CI の各ステップもこのコマンドをそのまま使う。
 
-```makefile
-ci: lint type test-unit test-slow
+### 開発サーバ・本番風サーバ
+```bash
+# 開発 (auto-reload)
+uv run fastapi dev app/main.py
 
-lint:
-	uv run ruff check .
-	uv run ruff format --check .
-
-type:
-	uv run mypy app
-
-test-unit:
-	uv run pytest -m "not slow"
-
-test-slow:
-	uv run pytest -m slow
-
-security: security-deps security-sast security-secrets security-dockerfile
-
-security-deps:
-	uv export --no-hashes > /tmp/requirements.txt
-	uv run pip-audit -r /tmp/requirements.txt
-
-security-sast:
-	uv run semgrep ci --config p/python --config p/security-audit --config p/owasp-top-ten --config p/jwt
-
-security-secrets:
-	gitleaks detect --redact --no-banner
-
-security-dockerfile:
-	docker run --rm -i hadolint/hadolint < docker/Dockerfile.api
+# 本番風 (multi-worker)
+uv run fastapi run app/main.py --workers 4
 ```
 
-`pip-audit`, `semgrep` は dev 依存に追加。`gitleaks`, `hadolint` はバイナリ前提 (CI と同じく `brew install`).
+### CI 同等チェック (PR 作成前)
+```bash
+# Lint + format
+uv run ruff check .
+uv run ruff format --check .
+
+# 型チェック
+uv run mypy app
+
+# テスト (Docker 必要)
+uv run pytest -m "not slow"
+uv run pytest -m slow
+```
+
+### Security チェック
+```bash
+# Python 依存脆弱性
+uv export --no-hashes --no-dev=false > /tmp/req.txt
+uv run pip-audit -r /tmp/req.txt
+
+# SAST
+uv run semgrep ci \
+  --config p/python \
+  --config p/security-audit \
+  --config p/owasp-top-ten \
+  --config p/jwt
+
+# 秘密情報スキャン
+gitleaks detect --redact --no-banner
+
+# Dockerfile lint
+docker run --rm -i hadolint/hadolint < docker/Dockerfile.api
+
+# Container image スキャン
+docker build -f docker/Dockerfile.api -t ec-api:dev .
+trivy image --severity HIGH,CRITICAL ec-api:dev
+```
+
+### 依存
+- `pip-audit`, `semgrep` は `pyproject.toml` の `[dependency-groups] dev` に追加 (uv で同梱インストール)
+- `gitleaks`, `hadolint`, `trivy` はバイナリ前提 (`brew install gitleaks hadolint aquasecurity/trivy/trivy`)。CI では公式 GitHub Action を使うので、ローカル必須ではない
+
+README にこれらをコピペ可能なブロックとして掲載する。ショートカット (`poe ci` 等) が将来欲しくなった場合は `poethepoet` を別 PR で追加する余地を残すが、本スコープでは導入しない。
 
 ## 10. 失敗時のフロー
 
 | 失敗パターン                                      | 対応                                                                                   |
 |---------------------------------------------------|----------------------------------------------------------------------------------------|
-| `lint` / `type`                                   | 開発者がローカル `make lint type` で修正                                                |
+| `lint` / `type`                                   | 開発者がローカル `uv run ruff check . && uv run mypy app` で修正                        |
 | `test-unit` / `test-slow`                         | 通常のテスト修正フロー                                                                  |
 | `deps` で HIGH/CRITICAL                           | ① 依存更新 PR、② Allowlist (`.security/pip-audit-ignore.yaml`) に期限付きで追加     |
 | `sast` 検知                                       | コード修正。誤検知は `.semgrepignore` ではなく **コードレベルの `# nosemgrep` コメント** を優先 (理由をコメント) |
@@ -247,11 +265,11 @@ CI/CD 自体には自動テストを書きづらいので、以下で検証す�
    - わざと `os.system(user_input)` を書く → `sast` が赤になる
    - 終わったら revert
 2. **正常系**: 既存コードベース (`feature/ec-api-impl` 相当) に対して **すべて緑** であることを確認
-3. **再現性**: `make ci`, `make security` がローカルで同じ結果を出す
+3. **再現性**: §9 のローカルコマンドが CI と同じ結果を出す
 
 ## 13. ロールアウト計画
 
-1. PR-A (本実装): `.github/workflows/*`, `.github/dependabot.yml`, allowlist 雛形, Makefile, README 追記
+1. PR-A (本実装): `.github/workflows/*`, `.github/dependabot.yml`, allowlist 雛形, README 追記 (§9 コマンド集 + ブランチ保護設定手順)
 2. PR-A マージ前: `feature/ci-security` ブランチで意図的失敗 PR をテスト
 3. PR-A マージ後: main にブランチ保護を手動設定
 4. 1 週間運用観察。 `image` / `dockerfile` / `iac` のノイズを評価し、必要なら必須化判断
@@ -259,6 +277,7 @@ CI/CD 自体には自動テストを書きづらいので、以下で検証す�
 
 ## 14. オープン項目 (将来検討)
 
+- 既存 `feature/ec-api-impl` の `Makefile` 削除 (本 spec は新規追加しないだけ。retroactive 削除は別 PR で対応)
 - CodeQL の追加 (Python は Semgrep と重複するが SARIF カバレッジ向上)
 - DAST 統合 (`本番デプロイ先` 確定後)
 - Dependabot 自動マージ (minor/patch のみ、security label 付きのみ)
@@ -266,3 +285,4 @@ CI/CD 自体には自動テストを書きづらいので、以下で検証す�
 - ブランチ保護を Terraform で IaC 化
 - SLSA Level 2 / 3 対応 (build provenance)
 - 署名付きコンテナイメージ (cosign)
+- ショートカット用 `poethepoet` 導入 (`poe ci`, `poe dev` 等)
