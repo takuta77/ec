@@ -290,4 +290,50 @@ async def drain_dlq(
     dry_run: bool = True,
 ) -> DrainResult:
     """Permanently discard up to `limit` messages from `<queue>.dlq`."""
-    raise NotImplementedError
+    dlq_name = f"{queue}.dlq"
+    chan = await connection.channel()
+    if limit is not None:
+        await chan.set_qos(prefetch_count=limit)
+    try:
+        try:
+            dlq = await chan.declare_queue(dlq_name, passive=True)
+        except aio_pika.exceptions.ChannelClosed as exc:
+            raise DLQNotFoundError(f"queue {dlq_name} does not exist") from exc
+
+        seen_tags: set[int] = set()
+        pending: list[aio_pika.abc.AbstractIncomingMessage] = []
+        drained = 0
+        async with dlq.iterator(no_ack=False, timeout=2.0) as q_iter:
+            try:
+                async for message in q_iter:
+                    tag = message.delivery_tag
+                    if tag is not None and tag in seen_tags:
+                        break
+                    if tag is not None:
+                        seen_tags.add(tag)
+
+                    if dry_run:
+                        pending.append(message)
+                    else:
+                        await message.ack()
+                        drained += 1
+
+                    if limit is not None and (drained + len(pending)) >= limit:
+                        break
+            except TimeoutError:
+                pass
+
+        for msg in pending:
+            await msg.nack(requeue=True)
+
+        _logger.info(
+            "dlq_admin.drain",
+            queue=dlq_name,
+            dry_run=dry_run,
+            drained=drained,
+            seen=len(seen_tags),
+        )
+        return DrainResult(queue=dlq_name, dry_run=dry_run, drained=drained)
+    finally:
+        if not chan.is_closed:
+            await chan.close()

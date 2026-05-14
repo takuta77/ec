@@ -55,14 +55,6 @@ def test_drain_result_dataclass() -> None:
     assert r.drained == 2
 
 
-@pytest.mark.asyncio
-async def test_drain_stub_raises_not_implemented() -> None:
-    from app.mq.dlq_admin import drain_dlq
-
-    with pytest.raises(NotImplementedError):
-        await drain_dlq(connection=None, queue="x", limit=1)  # type: ignore[arg-type]
-
-
 # ---------------------------------------------------------------------------
 # Slow integration tests (require Docker / Testcontainers)
 # ---------------------------------------------------------------------------
@@ -306,3 +298,56 @@ async def test_redrive_skips_messages_without_routing_key(rabbitmq_connection) -
     # The skipped one stayed in DLQ.
     await asyncio.sleep(0.2)
     assert (await count_dlq(connection=rabbitmq_connection, queue=queue)).message_count == 1
+
+
+@pytest.mark.slow
+@pytest.mark.asyncio
+async def test_drain_dry_run_leaves_messages(rabbitmq_connection) -> None:
+    from app.mq.dlq_admin import count_dlq, drain_dlq
+
+    queue = f"ec.test_drain_dry_{uuid.uuid4().hex[:8]}"
+    await _declare_dlq(rabbitmq_connection, queue)
+    for _ in range(2):
+        await _publish_to_dlq(rabbitmq_connection, routing_key="ec.x", body=b"x")
+    await asyncio.sleep(0.2)
+
+    r = await drain_dlq(connection=rabbitmq_connection, queue=queue, limit=None, dry_run=True)
+    assert r.dry_run is True
+    assert r.drained == 0
+
+    await asyncio.sleep(0.2)
+    assert (await count_dlq(connection=rabbitmq_connection, queue=queue)).message_count == 2
+
+
+@pytest.mark.slow
+@pytest.mark.asyncio
+async def test_drain_apply_removes_messages(rabbitmq_connection) -> None:
+    from app.mq.dlq_admin import count_dlq, drain_dlq
+
+    queue = f"ec.test_drain_apply_{uuid.uuid4().hex[:8]}"
+    routing_key = "ec.x"
+
+    chan = await rabbitmq_connection.channel()
+    await chan.declare_exchange(MAIN_EXCHANGE, "topic", durable=True)
+    await chan.declare_exchange(DLX_EXCHANGE, "topic", durable=True)
+    dlq = await chan.declare_queue(f"{queue}.dlq", durable=True)
+    await dlq.bind(DLX_EXCHANGE, routing_key="#")
+    sink = await chan.declare_queue(f"{queue}.sink", durable=True)
+    await sink.bind(MAIN_EXCHANGE, routing_key=routing_key)
+    await chan.close()
+
+    for _ in range(2):
+        await _publish_to_dlq(rabbitmq_connection, routing_key=routing_key, body=b"x")
+    await asyncio.sleep(0.2)
+
+    r = await drain_dlq(connection=rabbitmq_connection, queue=queue, limit=None, dry_run=False)
+    assert r.dry_run is False
+    assert r.drained == 2
+
+    await asyncio.sleep(0.3)
+    assert (await count_dlq(connection=rabbitmq_connection, queue=queue)).message_count == 0
+
+    chan2 = await rabbitmq_connection.channel()
+    sink_q = await chan2.declare_queue(f"{queue}.sink", passive=True)
+    assert sink_q.declaration_result.message_count == 0
+    await chan2.close()
