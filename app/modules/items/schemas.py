@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -9,6 +10,7 @@ class ItemCreate(BaseModel):
     description: str | None = None
     price_cents: int = Field(ge=0)
     currency: str = Field(min_length=3, max_length=3)
+    category: str | None = Field(default=None, min_length=1, max_length=50)
 
 
 class ItemOut(BaseModel):
@@ -19,3 +21,4 @@ class ItemOut(BaseModel):
     price_cents: int
     currency: str
     is_active: bool
+    category: str | None

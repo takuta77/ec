@@ -12,10 +12,20 @@ class ItemsService:
         self.items = items
 
     async def create(
-        self, *, name: str, price_cents: int, currency: str, description: str | None = None
+        self,
+        *,
+        name: str,
+        price_cents: int,
+        currency: str,
+        description: str | None = None,
+        category: str | None = None,
     ) -> Item:
         return await self.items.create(
-            name=name, price_cents=price_cents, currency=currency, description=description
+            name=name,
+            price_cents=price_cents,
+            currency=currency,
+            description=description,
+            category=category,
         )
 
     async def get(self, item_id: uuid.UUID) -> Item:
@@ -24,5 +34,15 @@ class ItemsService:
             raise NotFoundError("Item not found", details={"item_id": str(item_id)})
         return i
 
-    async def list_active(self, *, limit: int, offset: int) -> list[Item]:
-        return await self.items.list_active(limit=limit, offset=offset)
+    async def list_active(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        q: str | None = None,
+        category: str | None = None,
+    ) -> list[Item]:
+        return await self.items.list_active(limit=limit, offset=offset, q=q, category=category)
+
+    async def list_categories(self) -> list[str]:
+        return await self.items.list_categories()

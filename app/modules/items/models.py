@@ -16,6 +16,7 @@ class Item(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(50), nullable=True)
     price_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(CHAR(3), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
