@@ -94,11 +94,32 @@ Apply the following to `main` (and any long-lived `feature/*` branch):
 3. Tick:
    - **Require a pull request before merging** (1 approval, dismiss stale reviews)
    - **Require status checks to pass before merging**
-     - Required checks: `ci / lint`, `ci / type`, `ci / test-unit`, `ci / test-slow`, `security / scan / deps (pip-audit)`, `security / scan / sast (semgrep)`, `security / scan / secrets (gitleaks)`
+     - Required checks (initial rollout):
+       - `ci / test-unit`
+       - `ci / test-slow`
+       - `security / scan / deps (pip-audit)`
+       - `security / scan / sast (semgrep)`
+       - `security / scan / secrets (gitleaks)`
      - **Require branches to be up to date**: ON
    - **Require linear history**: ON
    - **Do not allow force pushes**: ON
    - **Do not allow deletions**: ON
 
-The `image`, `dockerfile`, `iac` jobs are warn-only and intentionally left
-off the required list until their noise level is evaluated.
+### Why `ci / lint` and `ci / type` are not required yet
+
+The current codebase has pre-existing `ruff` and `mypy --strict` violations
+inherited from earlier feature work (≈ 7 ruff errors, 38 format mismatches,
+25 mypy errors). The `lint` and `type` jobs run on every PR and the results
+appear in the Checks panel, but they are intentionally left off the
+required-checks list until a dedicated cleanup PR lands. See the
+"Open follow-ups" section in `docs/superpowers/specs/2026-05-14-ci-security-design.md`
+for the tracked work.
+
+After the cleanup PR is merged, add these two checks to the required list:
+- `ci / lint`
+- `ci / type`
+
+### Warn-only jobs
+
+`image`, `dockerfile`, `iac` are warn-only and intentionally left off the
+required list until their noise level is evaluated.

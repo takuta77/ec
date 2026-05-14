@@ -169,7 +169,8 @@ updates:
 | Require pull request before merging          | ON, 最低 1 approval                                            |
 | Dismiss stale reviews                        | ON                                                            |
 | Require status checks to pass                | ON                                                            |
-| Required checks                              | `ci / lint`, `ci / type`, `ci / test-unit`, `ci / test-slow`, `security / deps`, `security / sast`, `security / secrets` |
+| Required checks (初期)                       | `ci / test-unit`, `ci / test-slow`, `security / scan / deps (pip-audit)`, `security / scan / sast (semgrep)`, `security / scan / secrets (gitleaks)` |
+| Required checks (cleanup PR マージ後に追加) | `ci / lint`, `ci / type` |
 | Require branches to be up to date            | ON                                                            |
 | Require linear history                       | ON                                                            |
 | Require signed commits                       | OFF (将来検討)                                                 |
@@ -177,6 +178,8 @@ updates:
 | Allow deletions                              | OFF                                                           |
 
 README に GitHub UI でのスクリーンショット手順を記載。Terraform / `gh api` での自動化は対象外。
+
+**`lint`/`type` が初期 required から外れている理由**: 既存コードに pre-existing な ruff/format/mypy strict 違反が累積している (約 7 ruff errors、38 files format mismatch、25 mypy errors)。本 spec のスコープは CI/Security インフラ構築であり、コードクリーンアップは別 PR で対応する。クリーンアップ PR が main にマージされた後、両 check を required に追加する。詳細は §14 オープン項目 を参照。
 
 ## 9. ローカル再現 (README に手順を集約)
 
@@ -277,7 +280,17 @@ CI/CD 自体には自動テストを書きづらいので、以下で検証す�
 
 ## 14. オープン項目 (将来検討)
 
+### 直近で必要な follow-up
+
+- **コードベース cleanup PR (高優先)** — 既存の ruff / format / mypy strict 違反を解消し、`ci / lint` と `ci / type` を required check に昇格させる。具体的に対応するもの:
+  - **Ruff lint**: `pydantic.Field`, `mapped_column`, `Mapped`, `pytest` x2, `asyncio` の未使用 import 削除、`carts/router.py` の ambiguous 変数 `l` リネーム
+  - **Ruff format**: 38 ファイルを `uv run ruff format` で自動整形
+  - **Mypy strict**: `types-passlib` 追加、`python-jose` のスタブ整備、`app/core/security.py` の `no-any-return`、`app/modules/*/repository.py` の `Result[Any].rowcount` typing、`app/modules/items/router.py` の return type / bare `list`、`auth/dependencies.py` の `no_implicit_optional` 等を一括修正
+  - 完了後に README のブランチ保護手順を更新し、両 check を required に追加
 - 既存 `feature/ec-api-impl` の `Makefile` 削除 (本 spec は新規追加しないだけ。retroactive 削除は別 PR で対応)
+
+### 将来検討
+
 - CodeQL の追加 (Python は Semgrep と重複するが SARIF カバレッジ向上)
 - DAST 統合 (`本番デプロイ先` 確定後)
 - Dependabot 自動マージ (minor/patch のみ、security label 付きのみ)
@@ -286,3 +299,5 @@ CI/CD 自体には自動テストを書きづらいので、以下で検証す�
 - SLSA Level 2 / 3 対応 (build provenance)
 - 署名付きコンテナイメージ (cosign)
 - ショートカット用 `poethepoet` 導入 (`poe ci`, `poe dev` 等)
+- Action SHA-pinning (現状 mutable major tag、Dependabot 更新)
+- Semgrep container image を GitHub Actions の `container:` 用に Dependabot ターゲット追加 (`.github/workflows` ディレクトリ用エントリ)
