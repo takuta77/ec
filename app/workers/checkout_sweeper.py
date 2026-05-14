@@ -37,6 +37,7 @@ async def sweep_once(session: AsyncSession, *, timeout_hours: int, limit: int = 
 async def run() -> None:
     settings = get_settings()
     from app.core.telemetry import init_telemetry
+
     init_telemetry(service_name="ec-checkout-sweeper")
     engine = build_engine(settings.database_url)
     factory = build_session_factory(engine)

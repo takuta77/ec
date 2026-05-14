@@ -19,6 +19,7 @@ def create_app() -> FastAPI:
     async def _startup() -> None:
         from app.core.logging import configure_structlog
         from app.core.telemetry import init_telemetry, instrument_fastapi
+
         configure_structlog()
         init_telemetry(service_name="ec-api")
         instrument_fastapi(app)
@@ -36,7 +37,9 @@ def create_app() -> FastAPI:
     async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
         return JSONResponse(
             status_code=exc.http_status,
-            content=error_envelope(code=exc.code, message=exc.message, details=exc.details, trace_id=None),
+            content=error_envelope(
+                code=exc.code, message=exc.message, details=exc.details, trace_id=None
+            ),
         )
 
     app.include_router(auth_router)

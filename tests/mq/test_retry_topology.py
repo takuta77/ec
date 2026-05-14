@@ -22,7 +22,11 @@ def amqp_url(rabbit):
 
 async def test_declare_topology_idempotent(amqp_url):
     conn = await open_connection(amqp_url)
-    await declare_consumer_topology(conn, queue="ec.api.order-events", routing_keys=["order.created", "order.failed"])
+    await declare_consumer_topology(
+        conn, queue="ec.api.order-events", routing_keys=["order.created", "order.failed"]
+    )
     # Idempotent on second call
-    await declare_consumer_topology(conn, queue="ec.api.order-events", routing_keys=["order.created", "order.failed"])
+    await declare_consumer_topology(
+        conn, queue="ec.api.order-events", routing_keys=["order.created", "order.failed"]
+    )
     await conn.close()

@@ -30,7 +30,11 @@ async def test_publish_message_arrives(amqp_url):
     queue = await chan.declare_queue("test-q", durable=False, auto_delete=True)
     await queue.bind("ec.events", routing_key="checkout.requested")
 
-    await pub.publish(routing_key="checkout.requested", body=json.dumps({"k": 1}).encode(), headers={"traceparent": "tp"})
+    await pub.publish(
+        routing_key="checkout.requested",
+        body=json.dumps({"k": 1}).encode(),
+        headers={"traceparent": "tp"},
+    )
 
     msg = await queue.get(timeout=5)
     assert msg is not None

@@ -4,6 +4,7 @@ Revision ID: 0004
 Revises: 0003
 Create Date: 2026-05-13
 """
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
@@ -20,13 +21,24 @@ def upgrade() -> None:
         "carts",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("user_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("status", sa.Enum("open", "submitted", "ordered", "failed", name="cart_status", create_type=False), nullable=False, server_default="open"),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "open", "submitted", "ordered", "failed", name="cart_status", create_type=False
+            ),
+            nullable=False,
+            server_default="open",
+        ),
         sa.Column("checkout_request_id", UUID(as_uuid=True), nullable=True),
         sa.Column("order_id", UUID(as_uuid=True), nullable=True),
         sa.Column("submitted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("failure_reason", sa.String(100), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
     )
     op.create_index(
         "ix_carts_user_open",
@@ -45,7 +57,12 @@ def upgrade() -> None:
     op.create_table(
         "cart_items",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("cart_id", UUID(as_uuid=True), sa.ForeignKey("carts.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "cart_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("carts.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("item_id", UUID(as_uuid=True), sa.ForeignKey("items.id"), nullable=False),
         sa.Column("quantity", sa.Integer, nullable=False),
         sa.Column("unit_price_cents", sa.Integer, nullable=False),

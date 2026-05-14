@@ -30,7 +30,9 @@ class CartsService:
             return existing
         return await self.carts.create_open(user_id)
 
-    async def add_item(self, *, user_id: uuid.UUID, item_id: uuid.UUID, quantity: int) -> tuple[Cart, CartItem]:
+    async def add_item(
+        self, *, user_id: uuid.UUID, item_id: uuid.UUID, quantity: int
+    ) -> tuple[Cart, CartItem]:
         cart = await self.open_or_get(user_id)
         item = await self.items.find_by_id(item_id)
         if item is None or not item.is_active:
@@ -47,7 +49,9 @@ class CartsService:
             raise NotFoundError("Cart line not found", details={"item_id": str(item_id)})
         return cart
 
-    async def submit_checkout(self, *, user_id: uuid.UUID, traceparent: str | None = None) -> CheckoutOut:
+    async def submit_checkout(
+        self, *, user_id: uuid.UUID, traceparent: str | None = None
+    ) -> CheckoutOut:
         if self.outbox is None:
             raise RuntimeError("outbox repository not bound")
         cart = await self.carts.get_open_for_user(user_id)
@@ -72,7 +76,9 @@ class CartsService:
         cart_locked.submitted_at = datetime.now(tz=timezone.utc)
 
         envelope = build_checkout_requested(
-            cart=cart_locked, lines=line_items, checkout_request_id=checkout_request_id,
+            cart=cart_locked,
+            lines=line_items,
+            checkout_request_id=checkout_request_id,
         )
         headers = {"traceparent": traceparent} if traceparent else {}
         await self.outbox.append(

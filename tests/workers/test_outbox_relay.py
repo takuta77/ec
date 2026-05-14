@@ -27,7 +27,8 @@ def amqp_url(rabbit):
 async def test_relay_publishes_and_marks(db_session, amqp_url):
     repo = OutboxRepository(db_session)
     ev = await repo.append(
-        aggregate_type="cart", aggregate_id=uuid.uuid4(),
+        aggregate_type="cart",
+        aggregate_id=uuid.uuid4(),
         event_type="checkout.requested",
         payload={"event_id": "e-1", "data": {}},
         headers={"traceparent": "00-tp"},

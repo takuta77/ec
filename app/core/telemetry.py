@@ -36,14 +36,20 @@ def init_telemetry(service_name: str | None = None) -> None:
     resource = build_resource()
 
     tracer_provider = TracerProvider(resource=resource)
-    tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True)))
+    tracer_provider.add_span_processor(
+        BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True))
+    )
     trace.set_tracer_provider(tracer_provider)
 
-    metric_reader = PeriodicExportingMetricReader(OTLPMetricExporter(endpoint=endpoint, insecure=True))
+    metric_reader = PeriodicExportingMetricReader(
+        OTLPMetricExporter(endpoint=endpoint, insecure=True)
+    )
     metrics.set_meter_provider(MeterProvider(resource=resource, metric_readers=[metric_reader]))
 
     logger_provider = LoggerProvider(resource=resource)
-    logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter(endpoint=endpoint, insecure=True)))
+    logger_provider.add_log_record_processor(
+        BatchLogRecordProcessor(OTLPLogExporter(endpoint=endpoint, insecure=True))
+    )
     handler = LoggingHandler(level=logging.INFO, logger_provider=logger_provider)
     logging.getLogger().addHandler(handler)
     logging.getLogger().setLevel(logging.INFO)
@@ -65,4 +71,5 @@ def init_telemetry(service_name: str | None = None) -> None:
 
 def instrument_fastapi(app) -> None:
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
     FastAPIInstrumentor.instrument_app(app)

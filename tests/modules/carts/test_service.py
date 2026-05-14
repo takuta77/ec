@@ -64,6 +64,7 @@ async def test_submit_checkout_writes_outbox_and_marks_submitted(db_session):
 
 async def test_apply_order_created_transitions_only_from_submitted(db_session):
     from app.modules.outbox.repository import OutboxRepository
+
     users = UsersRepository(db_session)
     items_repo = ItemsRepository(db_session)
     u = await users.create(email="a@example.com", hashed_password="h")
@@ -77,6 +78,7 @@ async def test_apply_order_created_transitions_only_from_submitted(db_session):
     await db_session.commit()
 
     import uuid as _uuid
+
     affected = await svc.apply_order_result(
         event_type="order.created",
         checkout_request_id=submission.checkout_request_id,

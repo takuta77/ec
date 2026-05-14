@@ -31,8 +31,15 @@ async def _cart_with_lines(session: AsyncSession, cart) -> CartOut:
     repo = CartsRepository(session)
     lines = await repo.list_lines(cart.id)
     return CartOut(
-        id=cart.id, status=cart.status.value, failure_reason=cart.failure_reason,
-        lines=[CartLineOut(item_id=line.item_id, quantity=line.quantity, unit_price_cents=line.unit_price_cents) for line in lines],
+        id=cart.id,
+        status=cart.status.value,
+        failure_reason=cart.failure_reason,
+        lines=[
+            CartLineOut(
+                item_id=line.item_id, quantity=line.quantity, unit_price_cents=line.unit_price_cents
+            )
+            for line in lines
+        ],
     )
 
 
@@ -52,7 +59,9 @@ async def add_item(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> CartOut:
-    cart, _ = await _service(session).add_item(user_id=user.id, item_id=payload.item_id, quantity=payload.quantity)
+    cart, _ = await _service(session).add_item(
+        user_id=user.id, item_id=payload.item_id, quantity=payload.quantity
+    )
     await session.commit()
     return await _cart_with_lines(session, cart)
 
