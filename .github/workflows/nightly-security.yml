@@ -35,5 +35,6 @@ jobs:
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           gh issue create \
             --title "[security] nightly scan failure $DATE" \
-            --label "security,nightly" \
+            --label security \
+            --label nightly \
             --body "Nightly security scan failed. See run: $RUN_URL"
