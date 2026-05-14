@@ -1,4 +1,3 @@
-import pytest
 
 from app.core.telemetry import build_resource
 

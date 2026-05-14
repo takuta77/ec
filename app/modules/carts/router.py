@@ -32,7 +32,7 @@ async def _cart_with_lines(session: AsyncSession, cart) -> CartOut:
     lines = await repo.list_lines(cart.id)
     return CartOut(
         id=cart.id, status=cart.status.value, failure_reason=cart.failure_reason,
-        lines=[CartLineOut(item_id=l.item_id, quantity=l.quantity, unit_price_cents=l.unit_price_cents) for l in lines],
+        lines=[CartLineOut(item_id=line.item_id, quantity=line.quantity, unit_price_cents=line.unit_price_cents) for line in lines],
     )
 
 
