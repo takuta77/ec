@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
@@ -63,13 +64,13 @@ def init_telemetry(service_name: str | None = None) -> None:
     from opentelemetry.instrumentation.logging import LoggingInstrumentor
 
     SQLAlchemyInstrumentor().instrument()
-    AsyncPGInstrumentor().instrument()
+    AsyncPGInstrumentor().instrument()  # type: ignore[no-untyped-call]  # asyncpg instrumentor has no type stubs
     AioPikaInstrumentor().instrument()
     HTTPXClientInstrumentor().instrument()
     LoggingInstrumentor().instrument(set_logging_format=True)
 
 
-def instrument_fastapi(app) -> None:
+def instrument_fastapi(app: Any) -> None:
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
     FastAPIInstrumentor.instrument_app(app)
