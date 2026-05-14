@@ -43,6 +43,8 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
     "jsonschema>=4.23",
+    "pip-audit>=2.7",
+    "semgrep>=1.95",
 ]
 
 [tool.pytest.ini_options]
