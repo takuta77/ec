@@ -25,6 +25,7 @@ dependencies = [
     "opentelemetry-instrumentation-httpx>=0.50b0",
     "opentelemetry-instrumentation-logging>=0.50b0",
     "bcrypt<4.1",
+    "wheel==0.37.0",
 ]
 
 [build-system]

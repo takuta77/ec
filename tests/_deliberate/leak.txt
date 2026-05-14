@@ -1,0 +1,2 @@
+DO NOT MERGE — used to validate the gitleaks required check.
+AWS_SECRET_ACCESS_KEY=AKIAEXAMPLEKEY1234567890ABCDEFGHIJK
