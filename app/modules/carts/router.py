@@ -17,7 +17,7 @@ from app.modules.outbox.repository import OutboxRepository
 from app.modules.users.models import User
 
 
-router = APIRouter(prefix="/carts", tags=["carts"])
+router = APIRouter(prefix="/cart", tags=["cart"])
 
 
 def _service(session: AsyncSession) -> CartsService:
@@ -44,7 +44,7 @@ async def _cart_with_lines(session: AsyncSession, cart: Cart) -> CartOut:
     )
 
 
-@router.get("/me", response_model=CartOut)
+@router.get("", response_model=CartOut)
 async def get_my_cart(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -54,7 +54,7 @@ async def get_my_cart(
     return await _cart_with_lines(session, cart)
 
 
-@router.post("/me/items", response_model=CartOut)
+@router.post("/items", response_model=CartOut)
 async def add_item(
     payload: AddItemIn,
     user: Annotated[User, Depends(get_current_user)],
@@ -67,7 +67,7 @@ async def add_item(
     return await _cart_with_lines(session, cart)
 
 
-@router.delete("/me/items/{item_id}", response_model=CartOut)
+@router.delete("/items/{item_id}", response_model=CartOut)
 async def remove_item(
     item_id: uuid.UUID,
     user: Annotated[User, Depends(get_current_user)],
@@ -78,12 +78,31 @@ async def remove_item(
     return await _cart_with_lines(session, cart)
 
 
-@router.post("/{cart_id}/checkout", response_model=CheckoutOut, status_code=202)
+@router.post("/checkout", response_model=CheckoutOut, status_code=202)
 async def checkout(
-    cart_id: uuid.UUID,
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> CheckoutOut:
     result = await _service(session).submit_checkout(user_id=user.id)
     await session.commit()
     return result
+
+
+@router.post("/cancel")
+async def cancel(
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> dict[str, str]:
+    cart_id = await _service(session).cancel_my_open_cart(user_id=user.id)
+    await session.commit()
+    return {"status": "cancelled", "cart_id": str(cart_id)}
+
+
+@router.post("/reopen", response_model=CartOut)
+async def reopen(
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> CartOut:
+    cart = await _service(session).reopen_my_cart(user_id=user.id)
+    await session.commit()
+    return await _cart_with_lines(session, cart)

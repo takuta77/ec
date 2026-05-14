@@ -5,8 +5,10 @@ from typing import Any, cast
 
 from sqlalchemy import select, delete, update
 from sqlalchemy.engine import CursorResult
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import OpenCartAlreadyExistsError
 from app.modules.carts.models import Cart, CartItem, CartStatus
 
 
@@ -76,3 +78,38 @@ class CartsRepository:
         )
         result = await self.session.execute(stmt)
         return cast(CursorResult[Any], result).rowcount or 0
+
+    async def cancel_open(self, user_id: uuid.UUID) -> uuid.UUID | None:
+        stmt = (
+            update(Cart)
+            .where(Cart.user_id == user_id, Cart.status == CartStatus.open)
+            .values(status=CartStatus.cancelled)
+            .returning(Cart.id)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def reopen_failed_timeout(self, user_id: uuid.UUID) -> int:
+        try:
+            stmt = (
+                update(Cart)
+                .where(
+                    Cart.user_id == user_id,
+                    Cart.status == CartStatus.failed,
+                    Cart.failure_reason == "timeout",
+                )
+                .values(
+                    status=CartStatus.open,
+                    failure_reason=None,
+                    submitted_at=None,
+                    checkout_request_id=None,
+                    order_id=None,
+                )
+            )
+            result = await self.session.execute(stmt)
+            return cast(CursorResult[Any], result).rowcount or 0
+        except IntegrityError as e:
+            raise OpenCartAlreadyExistsError(
+                "Open cart already exists; cancel it before reopen",
+                details={"user_id": str(user_id)},
+            ) from e

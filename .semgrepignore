@@ -1,0 +1,5 @@
+# .semgrepignore
+# Skip auto-generated Alembic migration files; review manually instead.
+# Application code MUST NOT be added here — use inline `# nosemgrep: rule-id`
+# with a reason comment if a finding is a true false positive.
+migrations/versions/

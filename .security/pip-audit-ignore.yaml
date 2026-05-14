@@ -1,0 +1,10 @@
+# .security/pip-audit-ignore.yaml
+#
+# Each entry must include:
+#   - vuln_id: GHSA or PYSEC id
+#   - package: affected package
+#   - reason: why we cannot/should not patch now (be specific)
+#   - expires_at: YYYY-MM-DD, at most 60 days from when added
+#
+# The `deps` CI job rejects expired entries.
+ignores: []

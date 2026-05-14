@@ -105,3 +105,23 @@ class CartsService:
             order_id=order_id,
             failure_reason=failure_reason,
         )
+
+    async def cancel_my_open_cart(self, *, user_id: uuid.UUID) -> uuid.UUID:
+        cart_id = await self.carts.cancel_open(user_id)
+        if cart_id is None:
+            raise NotFoundError(
+                "No open cart to cancel",
+                details={"user_id": str(user_id)},
+            )
+        return cart_id
+
+    async def reopen_my_cart(self, *, user_id: uuid.UUID) -> Cart:
+        affected = await self.carts.reopen_failed_timeout(user_id)
+        if affected == 0:
+            raise NotFoundError(
+                "No reopenable cart found",
+                details={"user_id": str(user_id)},
+            )
+        cart = await self.carts.get_open_for_user(user_id)
+        assert cart is not None
+        return cart
