@@ -27,16 +27,16 @@ jobs:
         run: uv export --no-hashes --no-dev > /tmp/requirements.txt
       - name: Build pip-audit args (apply allowlist + reject expired)
         id: audit-args
-        # $today and $vuln_id in yq expressions are yq named variables, not shell variables.
+        # strenv(TODAY) reads the TODAY shell env var inside yq (mikefarah/yq v4 syntax).
         # SC2016 ("expressions don't expand in single quotes") is a false positive here.
         shell: bash
         run: |
           set -euo pipefail
           TODAY=$(date -u +%Y-%m-%d)
+          export TODAY
           # shellcheck disable=SC2016
-          EXPIRED=$(yq -r --arg today "$TODAY" \
-            '.ignores[] | select(.expires_at <= $today) | "\(.vuln_id) (expired \(.expires_at))"' \
-            .security/pip-audit-ignore.yaml || true)
+          EXPIRED=$(yq '.ignores[] | select(.expires_at <= strenv(TODAY)) | "\(.vuln_id) (expired \(.expires_at))"' \
+            .security/pip-audit-ignore.yaml)
           if [ -n "$EXPIRED" ]; then
             echo "::error::Expired entries in .security/pip-audit-ignore.yaml:"
             echo "$EXPIRED"
@@ -45,7 +45,7 @@ jobs:
           IGNORE_ARGS=""
           while IFS= read -r vid; do
             [ -n "$vid" ] && IGNORE_ARGS="$IGNORE_ARGS --ignore-vuln $vid"
-          done < <(yq -r '.ignores[].vuln_id // empty' .security/pip-audit-ignore.yaml)
+          done < <(yq '.ignores[].vuln_id | select(. != null)' .security/pip-audit-ignore.yaml)
           echo "args=$IGNORE_ARGS" >> "$GITHUB_OUTPUT"
       - name: Run pip-audit
         run: |
@@ -65,7 +65,7 @@ jobs:
     name: sast (semgrep)
     runs-on: ubuntu-latest
     container:
-      image: returntocorp/semgrep
+      image: semgrep/semgrep:1.162.0
     steps:
       - uses: actions/checkout@v4
       - name: Semgrep CI

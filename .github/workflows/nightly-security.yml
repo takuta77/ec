@@ -27,6 +27,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Ensure labels exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create security --color "e11d48" --description "Security related" --force || true
+          gh label create nightly --color "7c3aed" --description "Nightly automated run" --force || true
       - name: Open issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
