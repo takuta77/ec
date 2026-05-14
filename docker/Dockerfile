@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 ENV PYTHONUNBUFFERED=1
 ENV UV_LINK_MODE=copy
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates build-essential \
@@ -12,7 +12,7 @@ COPY app /app/app
 COPY migrations /app/migrations
 COPY alembic.ini /app/alembic.ini
 
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/app/.venv/bin:${PATH}"
 RUN useradd -m app
