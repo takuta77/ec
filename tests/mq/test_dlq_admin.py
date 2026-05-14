@@ -17,7 +17,7 @@ from app.mq.dlq_admin import (
     NoRoutingKeyError,
     RedriveResult,
 )
-from app.mq.retry import DLX_EXCHANGE
+from app.mq.retry import DLX_EXCHANGE, MAIN_EXCHANGE
 
 
 def test_exception_hierarchy() -> None:
@@ -56,11 +56,9 @@ def test_drain_result_dataclass() -> None:
 
 
 @pytest.mark.asyncio
-async def test_stubs_raise_not_implemented() -> None:
-    from app.mq.dlq_admin import drain_dlq, redrive_dlq
+async def test_drain_stub_raises_not_implemented() -> None:
+    from app.mq.dlq_admin import drain_dlq
 
-    with pytest.raises(NotImplementedError):
-        await redrive_dlq(connection=None, queue="x", limit=1)  # type: ignore[arg-type]
     with pytest.raises(NotImplementedError):
         await drain_dlq(connection=None, queue="x", limit=1)  # type: ignore[arg-type]
 
@@ -215,3 +213,96 @@ async def test_peek_handles_messages_without_message_id(rabbitmq_connection) -> 
 
     msgs = await peek_dlq(connection=rabbitmq_connection, queue=queue, limit=10)
     assert len(msgs) == 3, f"expected 3 but got {len(msgs)} — message_id-based dedup regression?"
+
+
+@pytest.mark.slow
+@pytest.mark.asyncio
+async def test_redrive_dry_run_does_not_publish(rabbitmq_connection) -> None:
+    from app.mq.dlq_admin import count_dlq, redrive_dlq
+
+    queue = f"ec.test_redrive_dry_{uuid.uuid4().hex[:8]}"
+    await _declare_dlq(rabbitmq_connection, queue)
+    for _ in range(2):
+        await _publish_to_dlq(rabbitmq_connection, routing_key="ec.order.completed", body=b"x")
+    await asyncio.sleep(0.2)
+
+    r = await redrive_dlq(connection=rabbitmq_connection, queue=queue, limit=None, dry_run=True)
+    assert r.dry_run is True
+    assert r.requested == 2
+    assert r.redriven == 0
+    assert r.skipped == []
+
+    await asyncio.sleep(0.2)
+    assert (await count_dlq(connection=rabbitmq_connection, queue=queue)).message_count == 2
+
+
+@pytest.mark.slow
+@pytest.mark.asyncio
+async def test_redrive_apply_publishes_to_main(rabbitmq_connection) -> None:
+    from app.mq.dlq_admin import count_dlq, redrive_dlq
+
+    queue = f"ec.test_redrive_apply_{uuid.uuid4().hex[:8]}"
+    routing_key = "ec.order.completed"
+
+    # DLQ for the consumer + sink bound to MAIN to prove republish.
+    chan = await rabbitmq_connection.channel()
+    await chan.declare_exchange(MAIN_EXCHANGE, "topic", durable=True)
+    await chan.declare_exchange(DLX_EXCHANGE, "topic", durable=True)
+    dlq = await chan.declare_queue(f"{queue}.dlq", durable=True)
+    await dlq.bind(DLX_EXCHANGE, routing_key="#")
+    sink = await chan.declare_queue(f"{queue}.sink", durable=True)
+    await sink.bind(MAIN_EXCHANGE, routing_key=routing_key)
+    await chan.close()
+
+    for i in range(2):
+        await _publish_to_dlq(rabbitmq_connection, routing_key=routing_key, body=f"m{i}".encode())
+    await asyncio.sleep(0.2)
+
+    r = await redrive_dlq(connection=rabbitmq_connection, queue=queue, limit=None, dry_run=False)
+    assert r.dry_run is False
+    assert r.requested == 2
+    assert r.redriven == 2
+    assert r.skipped == []
+
+    await asyncio.sleep(0.3)
+    assert (await count_dlq(connection=rabbitmq_connection, queue=queue)).message_count == 0
+
+    chan2 = await rabbitmq_connection.channel()
+    sink_q = await chan2.declare_queue(f"{queue}.sink", passive=True)
+    assert sink_q.declaration_result.message_count == 2
+    await chan2.close()
+
+
+@pytest.mark.slow
+@pytest.mark.asyncio
+async def test_redrive_skips_messages_without_routing_key(rabbitmq_connection) -> None:
+    """Messages with no routing key resolvable (no x-death + no envelope routing key)
+    should be skipped, not re-published."""
+    from app.mq.dlq_admin import count_dlq, redrive_dlq
+
+    queue = f"ec.test_redrive_skip_{uuid.uuid4().hex[:8]}"
+    await _declare_dlq(rabbitmq_connection, queue)
+
+    # Publish with routing key "" (empty) to break extraction; in real broker
+    # behavior, AMQP routing_key is always a string (possibly empty).
+    chan = await rabbitmq_connection.channel()
+    dlx = await chan.declare_exchange(DLX_EXCHANGE, "topic", durable=True)
+    bad_id = "no-routing-id"
+    await dlx.publish(
+        aio_pika.Message(body=b"orphan", headers={}, message_id=bad_id),
+        routing_key="",  # empty routing key — extraction returns None
+    )
+    # Good message for contrast.
+    await _publish_to_dlq(rabbitmq_connection, routing_key="ec.bar", body=b"good")
+    await chan.close()
+    await asyncio.sleep(0.2)
+
+    r = await redrive_dlq(connection=rabbitmq_connection, queue=queue, limit=None, dry_run=False)
+    # Two messages requested; one skipped (empty routing key), one redriven.
+    assert r.requested == 2
+    assert r.redriven == 1
+    assert len(r.skipped) == 1
+
+    # The skipped one stayed in DLQ.
+    await asyncio.sleep(0.2)
+    assert (await count_dlq(connection=rabbitmq_connection, queue=queue)).message_count == 1

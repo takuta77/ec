@@ -15,6 +15,8 @@ from typing import Any
 import aio_pika
 import structlog
 
+from app.mq.retry import MAIN_EXCHANGE
+
 
 _logger = structlog.get_logger("ec.mq.dlq_admin")
 
@@ -193,7 +195,91 @@ async def redrive_dlq(
     dry_run: bool = True,
 ) -> RedriveResult:
     """Re-publish DLQ messages to the main exchange using their original routing key."""
-    raise NotImplementedError
+    dlq_name = f"{queue}.dlq"
+    chan = await connection.channel()
+    if limit is not None:
+        await chan.set_qos(prefetch_count=limit)
+    try:
+        try:
+            dlq = await chan.declare_queue(dlq_name, passive=True)
+        except aio_pika.exceptions.ChannelClosed as exc:
+            raise DLQNotFoundError(f"queue {dlq_name} does not exist") from exc
+
+        main_ex = await chan.declare_exchange(MAIN_EXCHANGE, "topic", durable=True)
+
+        requested = 0
+        redriven = 0
+        skipped: list[str] = []
+        seen_tags: set[int] = set()
+        # Messages that were not acked (dry_run or skip) — nacked after the iterator
+        # closes to avoid triggering immediate re-delivery inside the consumer loop.
+        to_nack: list[aio_pika.abc.AbstractIncomingMessage] = []
+        async with dlq.iterator(no_ack=False, timeout=2.0) as q_iter:
+            try:
+                async for message in q_iter:
+                    tag = message.delivery_tag
+                    if tag is None or tag in seen_tags:
+                        # Re-delivery cycle guard: stop if we see a tag again.
+                        to_nack.append(message)
+                        break
+                    seen_tags.add(tag)
+
+                    requested += 1
+                    headers = dict(message.headers or {})
+                    rk = _extract_routing_key(headers) or (
+                        message.routing_key if message.routing_key else None
+                    )
+
+                    if rk is None:
+                        skipped.append(message.message_id or "<unknown>")
+                        to_nack.append(message)
+                    elif dry_run:
+                        to_nack.append(message)
+                    else:
+                        await main_ex.publish(
+                            aio_pika.Message(
+                                body=message.body,
+                                headers=headers,
+                                message_id=message.message_id,
+                                content_type=message.content_type,
+                                content_encoding=message.content_encoding,
+                                correlation_id=message.correlation_id,
+                                reply_to=message.reply_to,
+                            ),
+                            routing_key=rk,
+                        )
+                        await message.ack()
+                        redriven += 1
+
+                    if limit is not None and requested >= limit:
+                        break
+            except TimeoutError:
+                pass
+
+        # Nack deferred messages after iterator is closed (outside consumer scope)
+        for msg in to_nack:
+            try:
+                await msg.nack(requeue=True)
+            except Exception:  # noqa: BLE001
+                pass
+        _logger.info(
+            "dlq_admin.redrive",
+            queue=dlq_name,
+            dry_run=dry_run,
+            requested=requested,
+            redriven=redriven,
+            skipped=len(skipped),
+        )
+        return RedriveResult(
+            queue=dlq_name,
+            dry_run=dry_run,
+            requested=requested,
+            redriven=redriven,
+            skipped=skipped,
+        )
+    finally:
+        if not chan.is_closed:
+            await chan.close()
 
 
 async def drain_dlq(
