@@ -66,6 +66,8 @@ def create_app() -> FastAPI:
     app.include_router(users_router)
     app.include_router(items_router)
     app.include_router(cart_router)
+    from app.modules.admin.router import router as admin_router
+    app.include_router(admin_router)
     return app
 
 
