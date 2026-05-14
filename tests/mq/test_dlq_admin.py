@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from typing import Any
 
 import aio_pika
 import pytest
-
-import json
 
 from app.mq.dlq_admin import (
     CountResult,
@@ -188,3 +187,31 @@ def test_peek_preview_truncates_long_body() -> None:
     long_body = b"a" * 500
     assert _body_preview(long_body, 200) == "a" * 200
     assert _body_preview(b"\xff\xff", 200).startswith("b'")
+
+
+@pytest.mark.slow
+@pytest.mark.asyncio
+async def test_peek_handles_messages_without_message_id(rabbitmq_connection) -> None:
+    """Production messages don't set message_id; peek must not dedupe on it."""
+    from app.mq.dlq_admin import peek_dlq
+
+    queue = f"ec.test_peek_no_id_{uuid.uuid4().hex[:8]}"
+    await _declare_dlq(rabbitmq_connection, queue)
+
+    # Publish 3 messages with message_id=None (mimicking publisher.py).
+    chan = await rabbitmq_connection.channel()
+    dlx = await chan.declare_exchange(DLX_EXCHANGE, "topic", durable=True)
+    for i in range(3):
+        await dlx.publish(
+            aio_pika.Message(
+                body=f"m{i}".encode(),
+                headers={"x-death-count": 1},
+                # message_id intentionally omitted
+            ),
+            routing_key="ec.order.completed",
+        )
+    await chan.close()
+    await asyncio.sleep(0.2)
+
+    msgs = await peek_dlq(connection=rabbitmq_connection, queue=queue, limit=10)
+    assert len(msgs) == 3, f"expected 3 but got {len(msgs)} — message_id-based dedup regression?"

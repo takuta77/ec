@@ -139,16 +139,20 @@ async def peek_dlq(
 
         result: list[DLQMessage] = []
         pending: list[aio_pika.abc.AbstractIncomingMessage] = []
-        seen_ids: set[str | None] = set()
+        seen_tags: set[int] = set()
 
         async with dlq.iterator(no_ack=False, timeout=2.0) as q_iter:
             try:
                 async for message in q_iter:
-                    # Stop on re-delivery of an already-seen message to avoid cycles
-                    if message.message_id in seen_ids:
+                    # Stop on re-delivery of an already-seen delivery_tag to avoid cycles.
+                    # (message_id is not reliable: production publisher.py never sets it.)
+                    # delivery_tag is typed int | None by aio_pika but is always an int in
+                    # practice; guard for type-checker correctness.
+                    tag = message.delivery_tag
+                    if tag is None or tag in seen_tags:
                         await message.nack(requeue=True)
                         break
-                    seen_ids.add(message.message_id)
+                    seen_tags.add(tag)
                     headers = dict(message.headers or {})
                     rk = _extract_routing_key(headers) or message.routing_key
                     result.append(
