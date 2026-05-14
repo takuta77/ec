@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import subprocess
+import sys as _sys
 import uuid
 from typing import Any
 
@@ -351,3 +353,35 @@ async def test_drain_apply_removes_messages(rabbitmq_connection) -> None:
     sink_q = await chan2.declare_queue(f"{queue}.sink", passive=True)
     assert sink_q.declaration_result.message_count == 0
     await chan2.close()
+
+
+@pytest.mark.slow
+@pytest.mark.asyncio
+async def test_cli_count_smoke(rabbitmq_connection, rabbitmq_container) -> None:
+    """Run `scripts/dlq.py count <queue>` against Testcontainers RabbitMQ and assert output."""
+    queue = f"ec.test_cli_count_{uuid.uuid4().hex[:8]}"
+    await _declare_dlq(rabbitmq_connection, queue)
+    await _publish_to_dlq(rabbitmq_connection, routing_key="ec.x", body=b"x")
+    await asyncio.sleep(0.2)
+
+    port = rabbitmq_container.get_exposed_port(5672)
+    url = f"amqp://guest:guest@127.0.0.1:{port}/"
+
+    env = {
+        "RABBITMQ_URL": url,
+        "DATABASE_URL": "postgresql+asyncpg://x:x@localhost/x",
+        "JWT_PRIVATE_KEY_PATH": "/tmp/x.pem",
+        "JWT_PUBLIC_KEY_PATH": "/tmp/x.pem",
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
+        "PATH": "/usr/bin:/bin",
+    }
+    result = subprocess.run(
+        [_sys.executable, "scripts/dlq.py", "count", queue],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+        cwd="/Users/takuma/cross/ec/.worktrees/dlq-admin-tools",
+    )
+    assert result.returncode == 0, f"stderr={result.stderr}\nstdout={result.stdout}"
+    assert f"{queue}.dlq: 1" in result.stdout
