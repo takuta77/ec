@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
 from app.modules.auth.dependencies import get_current_user
+from app.modules.carts.models import Cart
 from app.modules.carts.repository import CartsRepository
 from app.modules.carts.schemas import AddItemIn, CartLineOut, CartOut, CheckoutOut
 from app.modules.carts.service import CartsService
@@ -27,7 +28,7 @@ def _service(session: AsyncSession) -> CartsService:
     )
 
 
-async def _cart_with_lines(session: AsyncSession, cart) -> CartOut:
+async def _cart_with_lines(session: AsyncSession, cart: Cart) -> CartOut:
     repo = CartsRepository(session)
     lines = await repo.list_lines(cart.id)
     return CartOut(

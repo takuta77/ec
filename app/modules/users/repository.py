@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,5 +22,5 @@ class UsersRepository:
         result = await self.session.execute(select(User).where(User.email == email))
         return result.scalar_one_or_none()
 
-    async def find_by_id(self, user_id) -> User | None:
+    async def find_by_id(self, user_id: uuid.UUID) -> User | None:
         return await self.session.get(User, user_id)
