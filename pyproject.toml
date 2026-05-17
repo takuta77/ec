@@ -46,7 +46,7 @@ dev = [
     "pip-audit>=2.7",
     "semgrep>=1.95",
     "types-passlib>=1.7",
-    "types-python-jose>=3.3",
+    "types-python-jose>=3.5.0.20260408",
 ]
 
 [tool.pytest.ini_options]
