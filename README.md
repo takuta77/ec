@@ -31,6 +31,31 @@ uv run pytest -m slow              # integration / workers / contracts (Docker r
 
 `docs/contracts/checkout.md` defines the cross-service idempotency requirements for `checkout.requested`.
 
+## Operations: DLQ tools
+
+Manage the per-consumer dead-letter queues (`<queue>.dlq`). Run from a shell
+with access to RabbitMQ via the `RABBITMQ_URL` env var. The CLI is a thin
+wrapper over the reusable helpers in `app/mq/dlq_admin.py`; the same
+helpers will back HTTP admin endpoints and monitoring jobs in later work.
+
+```bash
+# Show how many messages are stuck.
+uv run python scripts/dlq.py count ec.order_consumer
+
+# Inspect up to N messages (non-destructive).
+uv run python scripts/dlq.py peek ec.order_consumer --limit 5
+
+# Re-publish to the main exchange (dry-run by default).
+uv run python scripts/dlq.py redrive ec.order_consumer --limit 10
+uv run python scripts/dlq.py redrive ec.order_consumer --all --apply
+
+# Permanently discard.
+uv run python scripts/dlq.py drain ec.order_consumer --limit 10
+uv run python scripts/dlq.py drain ec.order_consumer --all --apply
+```
+
+Exit codes: `0` ok, `2` queue not found / arg error, `3` AMQP connection failed, `130` SIGINT.
+
 ## Local checks (same as CI)
 
 CI runs each tool directly via `uv run`; you can reproduce locally with the
