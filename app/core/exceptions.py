@@ -40,3 +40,8 @@ class ValidationError(AppError):
 class AuthError(AppError):
     code = "auth_error"
     http_status = 401
+
+
+class AuthorizationError(AppError):
+    code = "forbidden"
+    http_status = 403
