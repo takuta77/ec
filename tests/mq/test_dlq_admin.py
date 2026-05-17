@@ -5,6 +5,7 @@ import json
 import subprocess
 import sys as _sys
 import uuid
+from pathlib import Path
 from typing import Any
 
 import aio_pika
@@ -375,13 +376,16 @@ async def test_cli_count_smoke(rabbitmq_connection, rabbitmq_container) -> None:
         "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
         "PATH": "/usr/bin:/bin",
     }
+    # Repo root = two levels up from tests/mq/test_dlq_admin.py — portable across
+    # local worktrees and CI runners.
+    repo_root = Path(__file__).resolve().parents[2]
     result = subprocess.run(
         [_sys.executable, "scripts/dlq.py", "count", queue],
         capture_output=True,
         text=True,
         env=env,
         check=False,
-        cwd="/Users/takuma/cross/ec/.worktrees/dlq-admin-tools",
+        cwd=repo_root,
     )
     assert result.returncode == 0, f"stderr={result.stderr}\nstdout={result.stdout}"
     assert f"{queue}.dlq: 1" in result.stdout
