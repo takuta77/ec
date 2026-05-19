@@ -9,6 +9,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import ValidationError
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AppError
@@ -84,7 +85,8 @@ def _mount_spa(app: FastAPI) -> None:
     """
     try:
         settings = get_settings()
-    except Exception:
+    except ValidationError:
+        structlog.get_logger("ec._mount_spa").warning("spa_settings_unavailable")
         return
     if not settings.serve_frontend:
         return
@@ -101,6 +103,8 @@ def _mount_spa(app: FastAPI) -> None:
         )
 
     index_file = dist / "index.html"
+    if not index_file.is_file():
+        return
 
     @app.get("/admin/ui", include_in_schema=False)
     @app.get("/admin/ui/{rest:path}", include_in_schema=False)
