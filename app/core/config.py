@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     checkout_timeout_hours: int = 24
     max_consumer_retries: int = 5
 
+    serve_frontend: bool = False
+    frontend_dist_path: str = "frontend/dist"
+
 
 @lru_cache
 def get_settings() -> Settings:
