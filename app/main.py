@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import aio_pika
 import structlog
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.core.exceptions import AppError
 from app.db.session import dispose_engine, init_engine
 from app.modules.auth.router import router as auth_router
@@ -69,7 +71,41 @@ def create_app() -> FastAPI:
     from app.modules.admin.router import router as admin_router
 
     app.include_router(admin_router)
+
+    _mount_spa(app)
     return app
+
+
+def _mount_spa(app: FastAPI) -> None:
+    """Serve the built React SPA at /admin/ui when enabled and present.
+
+    Double-gated: serve_frontend setting AND the dist directory exists.
+    Default serve_frontend=False -> no-op.
+    """
+    try:
+        settings = get_settings()
+    except Exception:
+        return
+    if not settings.serve_frontend:
+        return
+    dist = Path(settings.frontend_dist_path)
+    if not dist.is_dir():
+        return
+
+    assets_dir = dist / "assets"
+    if assets_dir.is_dir():
+        app.mount(
+            "/admin/ui/assets",
+            StaticFiles(directory=assets_dir),
+            name="admin-ui-assets",
+        )
+
+    index_file = dist / "index.html"
+
+    @app.get("/admin/ui", include_in_schema=False)
+    @app.get("/admin/ui/{rest:path}", include_in_schema=False)
+    async def _spa_fallback(rest: str = "") -> FileResponse:
+        return FileResponse(index_file)
 
 
 app = create_app()
