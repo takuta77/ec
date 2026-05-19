@@ -1,239 +1,170 @@
-# Admin Console UI 設計
+# Admin Console UI 設計 (React + Vite SPA)
 
 **Date:** 2026-05-19
 **Status:** Draft → ユーザレビュー待ち
-**Scope:** EC API に server-rendered な管理コンソール UI を追加する。C-4 で実装した `/admin/*` JSON API のデータを、運用者がブラウザから閲覧できるようにする。
+**Scope:** EC API の `/admin/*` JSON API (C-4, PR #24 マージ済) を消費する React + Vite 製の管理コンソール SPA。
+
+**実装フェーズ分割 (重要):**
+- **Phase 1 (本 spec / 本 PR のスコープ)** — バックエンド側の SPA 配信インフラのみ。`Settings.serve_frontend` フラグ + `app/main.py` の StaticFiles マウント & SPA フォールバック。`frontend/` がまだ存在しなくても安全に動く。
+- **Phase 2 (別タスク / 別 spec で後日)** — `frontend/` 配下の React + Vite 実装一式。本 spec は Phase 2 の設計も記録するが、実装は分離する。
 
 ---
 
 ## 1. 目的と背景
 
-`docs/superpowers/specs/2026-05-15-admin-read-api-design.md` (C-4, PR #24 マージ済) で admin read API を整備した。しかし現状その API を叩く手段は `curl` / Swagger UI しかなく、運用者が日常的に状態を確認する UI が無い。
+C-4 (`docs/superpowers/specs/2026-05-15-admin-read-api-design.md`, PR #24) で `/admin/*` の read-only JSON API を整備済み。運用者がブラウザから閲覧する UI を、React + Vite の SPA として提供する。
 
-本 spec は C-4 の `AdminService` をそのまま再利用し、Jinja2 + HTMX による軽量な server-rendered コンソールを追加する。SPA・ビルドツール・別デプロイを持ち込まず、既存 FastAPI アプリ内で完結させる (内部運用ツールに対する YAGNI)。
+ユーザ指示により実装を 2 フェーズに分割する: 本 PR ではバックエンドが将来の SPA ビルド成果物を配信できる土台だけを作り、React 実装は別タスクに切り出す。これにより `app/main.py` への変更を React 作業から隔離し、フロント着手時に backend を触らずに済む。
 
 ## 2. ゴール / 非ゴール
 
-### ゴール
+### Phase 1 ゴール (本 PR)
+- `Settings.serve_frontend: bool = False` 設定追加
+- `app/main.py`: `serve_frontend=True` かつ `frontend/dist` 存在時のみ、SPA を `/admin/ui` 配下で配信 (StaticFiles + SPA フォールバック)
+- `frontend/dist` が存在しない (= React 未実装) 状態でもアプリ起動・既存テストが壊れない
+- `/admin/ui/*` の未知パスは `index.html` を返す (client-side routing 用)。`/admin/*`・`/auth/*` 等の API ルートは従来通り JSON
+- slow テストで「serve_frontend=True + ダミー dist → `/admin/ui/x` が index.html、API は JSON のまま」を検証
+- 既存 auth / admin API / 他モジュールを一切変更しない
 
-- `/admin/ui/*` 配下の HTML ページ群 (login / dashboard / carts / dlq / logout)
-- httpOnly cookie ベースの認証 (既存 JWT/auth ロジックを再利用、token 輸送路を header → cookie に変えるだけ)
-- UI ルートは既存 `AdminService` を直接呼ぶ (自分の JSON API への内部 HTTP 往復をしない)
-- HTMX による部分更新 (carts の status フィルタはテーブルフラグメントだけ差し替え)
-- HTMX を `app/static/` に vendoring (CDN 非依存、バージョン固定)
-- Slow (Testcontainers) + unit テストで認証・各ページ・フィルタを検証
-- 既存 JSON API / auth / モジュールを壊さない (追加のみ)
+### Phase 2 ゴール (別タスク、本 spec §8 に設計記録)
+- `frontend/` 配下に React 18 + TS + Vite SPA を実装
+- ページ: login / dashboard / carts / dlq
+- CI に frontend ジョブ追加、dependabot npm 追加
 
-### 非ゴール (§13 オープン項目で trace)
+### 非ゴール (両フェーズ共通、§9 で trace)
+- httpOnly cookie 認証 (backend 改修必要)
+- DLQ redrive/drain 等 write 操作 UI
+- ページネーション / 検索 / CSS framework / ダークモード / i18n / リアルタイム更新 / 監査ログ画面
+- E2E (Playwright)
+- 認証バックエンドの改修 (既存 `/auth/login`,`/auth/refresh`,`/auth/logout` をそのまま使う)
 
-- DLQ redrive/drain の UI ボタン (write 操作)
-- カート強制状態遷移の UI
-- ページネーション UI (今回は first page 固定、limit/offset は内部デフォルト)
-- 検索ボックス (全文)
-- CSS フレームワーク / デザインシステム (最小インライン CSS のみ)
-- ダークモード / i18n / リアルタイム更新 (WebSocket/SSE)
-- 監査ログ表示
-- admin user 作成 UI (DB 直接 UPDATE のまま)
+## 3. 認証モデル (Phase 2 で利用、backend 改修不要なことの確認)
 
-## 3. アーキテクチャ
+確認済み: `app/modules/auth/router.py` に `POST /auth/login` (TokenPair 返却), `POST /auth/refresh` (TokenPair), `POST /auth/logout`, `POST /auth/register` が既存。`/admin/*` は `require_admin` が `Authorization: Bearer` ヘッダから JWT を読む。
+
+→ **Phase 2 の SPA は既存エンドポイントをそのまま使えば良く、backend 認証コードの改修はゼロ**。SPA 側のトークン保持方針 (access=メモリ / refresh=sessionStorage) は §8 に記載。httpOnly cookie 化は backend 改修を伴うため非ゴール (§9 follow-up)。
+
+本 Phase 1 では認証コードに一切触れない。
+
+## 4. Phase 1 アーキテクチャ (backend SPA 配信)
 
 ```
-Browser ──GET /admin/ui (Cookie: admin_token)──▶ require_admin_cookie
-                                                   │ decode JWT (既存ロジック)
-                                                   │ load user, check is_admin
-                                                   │ fail → 302 /admin/ui/login
-                                                   ▼
-                                          admin_ui/router.py handler
-                                                   │
-                                                   ▼
-                                          AdminService (C-4, 既存) ──▶ DB / MQ
-                                                   │
-                                                   ▼
-                                          Jinja2 render (full page or HTMX fragment)
-                                                   │
-                                                   ▼
-                                          HTML response
+本番 (serve_frontend=True, frontend/dist あり):
+  GET /admin/stats/items   → 既存 admin API (JSON, require_admin)
+  GET /admin/ui            → frontend/dist/index.html
+  GET /admin/ui/carts      → frontend/dist/index.html  (SPA fallback, React Router が処理)
+  GET /admin/ui/assets/x   → frontend/dist/assets/x    (StaticFiles)
+
+dev / テスト (serve_frontend=False もしくは dist 無し):
+  /admin/ui* ルートは登録されない (API のみ稼働、Vite が UI 配信)
 ```
 
-UI 層は presentation のみ。集計ロジックは C-4 の `AdminService` / `AdminRepository` をそのまま使う。重複実装ゼロ。
+### 配信パス設計
 
-## 4. 認証
+- SPA ベースパス = `/admin/ui` (JSON API prefix `/admin/*` と名前空間が衝突しない: `/admin/stats/*`,`/admin/carts`,`/admin/dlq/*` は具体パス、`/admin/ui` は別サブツリー)
+- 静的アセット: `/admin/ui/assets/*` → `frontend/dist/assets/*`
+- SPA フォールバック: `GET /admin/ui` および `GET /admin/ui/{rest:path}` で、対応する静的ファイルが無ければ `frontend/dist/index.html` を返す
+- React Router の `basename` は Phase 2 で `/admin/ui` に設定
 
-### Cookie
+### Settings
 
-- 名前: `admin_token`
-- 属性: `HttpOnly`, `SameSite=Lax`, `Path=/admin/ui`, `Secure` は設定で切替 (本番 true / ローカル false。`Settings` に `cookie_secure: bool = False` を追加)
-- 値: 既存の access JWT (auth service が発行するものと同一)
-- 有効期限: JWT の exp に従う (cookie 自体は session cookie、ブラウザ閉じで消える + JWT exp で実効期限)
-
-### フロー
-
-| Route | 動作 |
-|---|---|
-| `GET /admin/ui/login` | login.html を描画 (既ログインなら dashboard へ 302) |
-| `POST /admin/ui/login` | form `email`,`password` を既存 auth service で検証。成功かつ `is_admin=True` → JWT 発行 → `admin_token` cookie set → `/admin/ui` へ 302。失敗 → login.html を `error` 付きで 200 再描画 |
-| `POST /admin/ui/logout` | `admin_token` cookie 削除 → `/admin/ui/login` へ 302 |
-
-`POST /admin/ui/login` の検証:
-- email/password が既存ユーザと一致しない → error 「メールアドレスまたはパスワードが正しくありません」
-- 一致するが `is_admin=False` → error 「管理者権限がありません」(情報過多にならない範囲で。ユーザ存在は秘匿しなくてよい内部ツール前提)
-
-### `require_admin_cookie` dependency
-
-`app/modules/admin_ui/dependencies.py`:
+`app/core/config.py` の `Settings` に追加:
 
 ```python
-async def require_admin_cookie(
-    request: Request,
-    session: AsyncSession = Depends(get_session),
-) -> User:
-    token = request.cookies.get("admin_token")
-    if not token:
-        raise _RedirectToLogin
-    try:
-        payload = decode_access_token(token)   # 既存 app/core/security の関数を再利用
-    except Exception:
-        raise _RedirectToLogin
-    user = await UsersRepository(session).find_by_id(uuid.UUID(payload["sub"]))
-    if user is None or not user.is_admin:
-        raise _RedirectToLogin
-    return user
+serve_frontend: bool = False
+frontend_dist_path: str = "frontend/dist"
 ```
 
-`_RedirectToLogin` は `RedirectResponse('/admin/ui/login', status_code=302)` を返すための仕組み。FastAPI の exception handler で `AdminUIRedirect` 例外を 302 に変換する (router 単位の `@router` 例外ハンドラ、または各ハンドラで try/except)。実装は「カスタム例外 `AdminUIAuthRequired` を投げ、`app/main.py` で `@app.exception_handler(AdminUIAuthRequired)` が `RedirectResponse('/admin/ui/login', 302)` を返す」方式とする (既存 `AppError` ハンドラとは別系統、HTML 用)。
+env から上書き可能 (`SERVE_FRONTEND=true`)。
 
-既存 `app/core/security.py` の token decode 関数名は実装時に確認 (`decode_access_token` 等)。auth service のパスワード検証関数も同様に再利用する。
+### app/main.py 変更
 
-## 5. ページ仕様
+`create_app()` 内、API ルータ include の後に:
 
-### `GET /admin/ui` (dashboard)
+```python
+if settings.serve_frontend:
+    dist = Path(settings.frontend_dist_path)
+    if dist.is_dir():
+        app.mount(
+            "/admin/ui/assets",
+            StaticFiles(directory=dist / "assets"),
+            name="admin-ui-assets",
+        )
 
-4 つの stat カードを縦/グリッドで表示:
-
-- **Items**: total / active / by_category (上位カテゴリをリスト)
-- **Carts**: status 別カウント (open/submitted/ordered/failed/cancelled) + failed_with_timeout
-- **Outbox**: pending / dispatched / oldest_pending_at
-- **DLQ**: queue 別 message_count (MQ 不可なら「MQ 接続不可」表示)
-
-データは `AdminService.items_stats()` 等を直接呼ぶ。
-
-### `GET /admin/ui/carts?status=<>`
-
-- status フィルタ dropdown (全 5 status + 「すべて」)
-- テーブル: id (短縮表示) / user_id (短縮) / status / failure_reason / line_count / created_at
-- dropdown 変更時 HTMX で `GET /admin/ui/carts?status=X` を呼び、`hx-target="#carts-table"` に `_carts_table.html` フラグメントだけ swap
-- 件数は `AdminService.list_carts(status=..., limit=50, offset=0)` 固定 (ページネーションは非ゴール)
-- `?status=` が HTMX リクエスト (`HX-Request` ヘッダ有) ならフラグメントのみ、通常リクエストならフルページを返す
-
-### `GET /admin/ui/dlq?queue=<>`
-
-- queue 選択 dropdown (`KNOWN_CONSUMER_QUEUES` から生成)
-- peek テーブル: event_id / routing_key / death_count / body_preview
-- `AdminService.peek_dlq(queue, limit=20, preview_chars=200)` を呼ぶ
-- `MQConnectionUnavailable` → 「MQ 接続不可」メッセージ (503 にしない、画面は維持)
-- `DLQNotFoundError` → 「キュー <name>.dlq は存在しません (滞留メッセージ無し)」表示
-
-## 6. ファイル構成
-
-```
-app/modules/admin_ui/
-├── __init__.py
-├── dependencies.py            # require_admin_cookie, AdminUIAuthRequired 例外
-├── router.py                  # login/logout/dashboard/carts/dlq routes
-└── templates/
-    ├── base.html              # layout: header + sidebar nav + content block, インライン CSS, htmx script tag
-    ├── login.html
-    ├── dashboard.html
-    ├── carts.html             # フルページ (テーブルは _carts_table を include)
-    ├── _carts_table.html      # HTMX フラグメント
-    └── dlq.html
-
-app/static/
-└── htmx.min.js                # vendored, バージョンをコメントで固定明記
-
-app/main.py                    # admin_ui router include + StaticFiles mount("/static") + Jinja2Templates
-pyproject.toml                 # jinja2 を dependencies に追加 (python-multipart は導入済)
+        @app.get("/admin/ui", include_in_schema=False)
+        @app.get("/admin/ui/{rest:path}", include_in_schema=False)
+        async def _spa_fallback(rest: str = "") -> FileResponse:
+            return FileResponse(dist / "index.html")
 ```
 
-Jinja2 テンプレートのロード: `fastapi.templating.Jinja2Templates(directory="app/modules/admin_ui/templates")`。`app/main.py` か router モジュールでインスタンス化。
+- `settings` は `create_app` 内で `Settings()` を取得 (既存パターンに合わせる。既に取得していれば再利用)
+- `dist.is_dir()` ガードにより、`serve_frontend=True` でも `frontend/dist` 不在なら何もしない (React 未実装期間でも安全)
+- `include_in_schema=False` で OpenAPI に出さない
+- `/admin/ui/assets` の StaticFiles マウントが先、フォールバックの catch-all が後 (ルート評価順。FastAPI は mount を優先解決)
+- API ルート (`/admin/stats/*` 等) は catch-all `/admin/ui/{rest:path}` と prefix が異なるため影響なし
 
-## 7. 依存追加
+依存: `from pathlib import Path`, `from fastapi.staticfiles import StaticFiles`, `from fastapi.responses import FileResponse` を `app/main.py` に追加。`StaticFiles` は `starlette` 経由で fastapi に含まれる (追加依存なし)。
 
-- `jinja2>=3.1` を `[project] dependencies` に追加 (現状未導入を確認済み)
-- `python-multipart` は導入済 (form POST 解析に使用)
-- HTMX は JS のみ。`app/static/htmx.min.js` に vendoring (例: htmx 2.x の固定版。ファイル先頭コメントにバージョンと取得元 URL を記載)
+## 5. Phase 1 ファイル変更
 
-## 8. CSS / レイアウト方針
+```
+app/core/config.py             # serve_frontend, frontend_dist_path 追加
+app/main.py                    # SPA 配信 (serve_frontend ガード)
+tests/test_spa_serving.py      # 新規 — slow テスト
+```
 
-- `base.html` に最小限のインライン `<style>` (sidebar 固定幅 + content、テーブル罫線、stat カード枠)
-- 外部 CSS フレームワーク無し (Tailwind/Bootstrap は YAGNI)
-- レスポンシブ対応は最小 (デスクトップ運用前提、モバイル最適化は非ゴール)
+`frontend/` ディレクトリは Phase 1 では作らない (Phase 2)。
 
-## 9. エラーハンドリング
+## 6. Phase 1 エラーハンドリング / エッジケース
 
 | 状況 | 動作 |
 |---|---|
-| cookie 無し / 不正 JWT / 期限切れ / non-admin | `AdminUIAuthRequired` → 302 `/admin/ui/login` |
-| login 資格情報不正 | login.html 200 + error 文言 |
-| login で非 admin | login.html 200 + 「管理者権限がありません」 |
-| DLQ で MQ 不可 | dlq.html 内に注意表示 (200、画面維持) |
-| DLQ で queue 不在 | dlq.html 内に「滞留無し」表示 (200) |
-| その他予期せぬ例外 | 既存の `AppError`/FastAPI デフォルトに委譲 (UI 専用整形はしない) |
+| `serve_frontend=False` (デフォルト) | `/admin/ui*` ルート未登録。`GET /admin/ui` は 404 (FastAPI 標準) |
+| `serve_frontend=True` だが `frontend/dist` 不在 | ルート未登録。404。アプリ起動は正常 |
+| `serve_frontend=True` + dist あり、`GET /admin/ui/carts` | `index.html` (200) |
+| `GET /admin/ui/assets/main.js` (存在) | StaticFiles が配信 |
+| `GET /admin/ui/assets/missing.js` (不在) | StaticFiles の 404 (フォールバックには流さない。assets は実ファイル前提) |
+| `GET /admin/stats/items` | 従来通り admin API (catch-all に食われない、prefix 不一致) |
 
-## 10. セキュリティ考慮
+## 7. Phase 1 テスト戦略
 
-- cookie は `HttpOnly` (JS から読めない、XSS で token 窃取されにくい)
-- `SameSite=Lax` (CSRF 緩和。POST フォームは same-origin なので Lax で十分。state 変更操作は login/logout のみ)
-- `POST /admin/ui/login` / `logout` は same-origin フォーム。CSRF トークンは **本 spec では導入しない** (内部ツール + SameSite=Lax + 状態変更が auth のみ。将来 write 操作追加時に CSRF トークン導入を §13 に記載)
-- `cookie_secure` 設定で本番 HTTPS 時に `Secure` 付与
-- テンプレートは Jinja2 オートエスケープ有効 (XSS 防止、`.html` 拡張子で自動 ON)
+`tests/test_spa_serving.py` (slow 不要、`app_with_db` も不要 — `create_app` を直接構築できるなら unit。ただし Settings 依存があるため、環境変数で `serve_frontend` を切り替える形にする):
 
-## 11. テスト戦略
+1. **serve_frontend=False**: `create_app()` → `GET /admin/ui` が 404
+2. **serve_frontend=True + dist 無し**: `GET /admin/ui` が 404、アプリ生成は成功
+3. **serve_frontend=True + ダミー dist**: 一時ディレクトリに `index.html` + `assets/app.js` を作り `frontend_dist_path` をそこに向ける →
+   - `GET /admin/ui` → 200, body に index.html の内容
+   - `GET /admin/ui/carts` → 200, 同じ index.html (SPA fallback)
+   - `GET /admin/ui/assets/app.js` → 200, app.js の内容
+   - `GET /admin/stats/items` → API に届く (認証無しなら 401、SPA fallback されない)
 
-### Unit (`tests/modules/admin_ui/test_dependencies.py`)
-- `require_admin_cookie`: cookie 無し → AdminUIAuthRequired
-- 不正 JWT → AdminUIAuthRequired
-- 有効 JWT だが user.is_admin=False → AdminUIAuthRequired
-- 有効 admin → User 返却
+Settings をテストで差し替える方法: `Settings` は pydantic-settings なので、テスト内で環境変数 (`SERVE_FRONTEND`, `FRONTEND_DIST_PATH`) を `monkeypatch.setenv` してから `create_app()` を呼ぶ。`create_app` が `Settings()` を内部生成する前提。もし `create_app` がグローバル settings をキャッシュしている場合は、テストで明示的に再生成できるよう最小リファクタ (関数引数 `settings: Settings | None = None`) を許容 — ただし既存呼び出し互換を壊さないこと。
 
-### Slow (Testcontainers, `tests/modules/admin_ui/test_router.py`)
-1. 未ログインで `GET /admin/ui` → 302 Location `/admin/ui/login`
-2. `GET /admin/ui/login` → 200, フォーム HTML 含む
-3. `POST /admin/ui/login` 正資格 (admin) → 302 to `/admin/ui` + `admin_token` cookie set (HttpOnly)
-4. `POST /admin/ui/login` 誤パスワード → 200 + error 文言
-5. `POST /admin/ui/login` 非 admin user → 200 + 「管理者権限がありません」
-6. login 後 cookie 付きで `GET /admin/ui` → 200 + stat 数値がレンダリングされている
-7. `GET /admin/ui/carts` (cookie 付) → 200, テーブル行が seed したカート数と一致
-8. `GET /admin/ui/carts?status=failed` 通常リクエスト → フルページ、failed のみ
-9. `GET /admin/ui/carts?status=failed` + `HX-Request: true` ヘッダ → フラグメントのみ (`<html>` 含まない、テーブルのみ)
-10. `GET /admin/ui/dlq` (cookie 付、MQ 無し環境) → 200 + 「MQ 接続不可」表示 (503 でない)
-11. `POST /admin/ui/logout` → 302 to login + cookie 削除 (Set-Cookie with empty/expired)
+## 8. Phase 2 設計記録 (別タスク、本 PR では実装しない)
 
-### 静的検証
-- `jinja2` テンプレートの構文は実行時にレンダリングテストで担保 (テンプレートリンタは導入しない)
-- ruff/mypy は Python コード (`router.py`, `dependencies.py`) のみ対象、テンプレートは対象外
+将来の React 実装タスクのための設計メモ。実装時はこの §8 を別 spec に切り出すか、本 spec を参照する。
 
-## 12. ロールアウト計画
+- **スタック**: React 18 + TypeScript + Vite、React Router v6、薄い fetch ラッパー (TanStack Query 不使用)、プレーン CSS、Biome (lint+format)、Vitest、npm
+- **ディレクトリ**: `frontend/` (repo ルート直下)。`src/{api,auth,pages,components}`、`vite.config.ts` に dev proxy (`/admin`,`/auth` → `localhost:8000`)
+- **認証**: 既存 `/auth/login` → access=メモリ / refresh=sessionStorage。401 で `/auth/refresh` リトライ。`/admin/*` に Bearer 付与。React Router basename=`/admin/ui`
+- **ページ**: `/admin/ui/login`, `/admin/ui` (dashboard 4 stat カード), `/admin/ui/carts` (status フィルタ), `/admin/ui/dlq` (queue 選択 peek)
+- **ビルド**: `npm run build` → `frontend/dist/`。本番は Phase 1 の配信機構が拾う
+- **CI**: `ci.yml` に `frontend` ジョブ (npm ci → biome ci → tsc --noEmit → vitest run → build)。`dependabot.yml` に npm ecosystem (`/frontend`)
+- **テスト**: Vitest + Testing Library + MSW (API モック)、AuthContext / api client / 各 page
 
-1. PR: jinja2 依存 + admin_ui モジュール + テンプレート + static + テスト
-2. CI green (全 7 必須チェック + warn-only)
-3. main マージ後、本番で 1 admin ユーザに `is_admin=true` (C-4 で既に手順化済)
-4. 運用者が `/admin/ui/login` からアクセス
-5. フィードバックを §13 に反映し、write 操作 (DLQ redrive 等) を次 spec で検討
-
-## 13. オープン項目 (将来検討)
+## 9. オープン項目 (将来検討)
 
 ### 直近で必要になりそう
-- **DLQ redrive/drain の UI ボタン** — write 操作。CSRF トークン導入とセットで別 spec
-- **カート強制状態遷移 UI** — 救済操作、慎重に
-- **ページネーション UI** — carts/dlq が大量化したら next/prev
-- **CSRF トークン** — write 操作追加時に必須化
+- **Phase 2: React 実装本体** (別タスク化、ユーザ指示)
+- **httpOnly cookie 認証** — XSS 耐性強化、backend 改修必要
+- **DLQ redrive/drain UI / カート強制遷移 UI** — write 操作、CSRF トークンとセット
+- **ページネーション UI**
 
 ### 将来検討
-- 検索ボックス (全文)
-- CSS フレームワーク / デザインシステム
-- ダークモード / i18n
-- リアルタイム更新 (HTMX polling or SSE)
-- 監査ログ表示画面
-- admin user 招待フロー UI
-- セッション一覧 / 強制ログアウト
+- 検索ボックス / CSS framework / ダークモード / i18n / リアルタイム更新 (SSE) / 監査ログ画面 / E2E (Playwright) / admin user 招待 UI / セッション管理画面
+
+## 10. ロールアウト
+
+1. **Phase 1 PR (本 PR)**: config + main.py SPA 配信 + テスト。`serve_frontend` デフォルト false なので本番挙動に影響なし
+2. CI green、main マージ
+3. **Phase 2 タスク**: 別 spec/plan で React 実装 → `frontend/dist` 生成 → 本番で `SERVE_FRONTEND=true` 有効化
