@@ -47,7 +47,7 @@ dev = [
     "jsonschema>=4.25,<4.26",
     "pip-audit>=2.7",
     "semgrep>=1.95",
-    "types-passlib>=1.7",
+    "types-passlib>=1.7.7.20260211",
     "types-python-jose>=3.5.0.20260408",
 ]
 
