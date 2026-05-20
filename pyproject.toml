@@ -36,7 +36,7 @@ packages = ["app"]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.3",
+    "pytest>=9.0.3",
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",
     "testcontainers[postgres,rabbitmq]>=4.14.2",
