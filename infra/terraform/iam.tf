@@ -55,9 +55,12 @@ data "aws_iam_policy_document" "github_assume" {
       values   = ["sts.amazonaws.com"]
     }
     condition {
-      test     = "StringLike"
+      test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:*"]
+      values = [
+        "repo:${var.github_repo}:ref:refs/heads/main",
+        "repo:${var.github_repo}:environment:production",
+      ]
     }
   }
 }
@@ -99,6 +102,46 @@ data "aws_iam_policy_document" "github_deploy" {
     sid       = "PassRole"
     actions   = ["iam:PassRole"]
     resources = [aws_iam_role.ecs_task_execution.arn, aws_iam_role.ecs_task.arn]
+  }
+
+  statement {
+    sid = "ElbForBlueGreen"
+    actions = [
+      "elasticloadbalancing:DescribeTargetGroups",
+      "elasticloadbalancing:DescribeListeners",
+      "elasticloadbalancing:DescribeRules",
+      "elasticloadbalancing:ModifyListener",
+      "elasticloadbalancing:ModifyRule",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "CloudWatchForAlarms"
+    actions   = ["cloudwatch:DescribeAlarms"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid = "TerraformState"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject",
+      "s3:ListBucket",
+    ]
+    resources = [
+      "arn:aws:s3:::${var.tfstate_bucket}",
+      "arn:aws:s3:::${var.tfstate_bucket}/*",
+    ]
+  }
+
+  # Admin-equivalent for Terraform apply. spec §7.6 — splitting into a
+  # separate `github_terraform` role is a follow-up.
+  statement {
+    sid       = "TerraformApplyAdmin"
+    actions   = ["*"]
+    resources = ["*"]
   }
 }
 
