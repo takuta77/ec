@@ -52,10 +52,13 @@ resource "aws_lb_target_group" "api" {
   }
 }
 
+# HTTPS/TLS は Route53 + ACM とセットで C-1c に切り出し済み (spec §11)。
+# 暫定で HTTP-only。TLS 対応時に listener 443 を追加 + 80 は redirect に切り替える。
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
-  protocol          = "HTTP"
+  # nosemgrep: terraform.aws.security.insecure-load-balancer-tls-version.insecure-load-balancer-tls-version
+  protocol = "HTTP"
 
   default_action {
     type             = "forward"

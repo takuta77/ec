@@ -36,4 +36,6 @@ resource "aws_db_instance" "main" {
   final_snapshot_identifier   = "${var.project}-${var.env}-final"
   deletion_protection         = true
   storage_encrypted           = true
+
+  enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
 }
