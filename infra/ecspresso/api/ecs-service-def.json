@@ -1,6 +1,11 @@
 {
   "launchType": "FARGATE",
   "desiredCount": 1,
+  "deploymentController": { "type": "ECS" },
+  "deploymentConfiguration": {
+    "strategy": "BLUE_GREEN",
+    "bakeTimeInMinutes": 5
+  },
   "networkConfiguration": {
     "awsvpcConfiguration": {
       "subnets": [
@@ -13,10 +18,24 @@
   },
   "loadBalancers": [
     {
-      "targetGroupArn": "{{ tfstate `aws_lb_target_group.api.arn` }}",
       "containerName": "app",
-      "containerPort": 8000
+      "containerPort": 8000,
+      "targetGroupArn": "{{ tfstate `aws_lb_target_group.api.arn` }}",
+      "advancedConfiguration": {
+        "alternateTargetGroupArn": "{{ tfstate `aws_lb_target_group.api_green.arn` }}",
+        "productionListenerRule": "{{ tfstate `aws_lb_listener.http.arn` }}"
+      }
     }
   ],
+  "alarms": {
+    "enable": true,
+    "rollback": true,
+    "alarmNames": [
+      "{{ tfstate `aws_cloudwatch_metric_alarm.api_5xx[\"blue\"].alarm_name` }}",
+      "{{ tfstate `aws_cloudwatch_metric_alarm.api_5xx[\"green\"].alarm_name` }}",
+      "{{ tfstate `aws_cloudwatch_metric_alarm.api_unhealthy[\"blue\"].alarm_name` }}",
+      "{{ tfstate `aws_cloudwatch_metric_alarm.api_unhealthy[\"green\"].alarm_name` }}"
+    ]
+  },
   "healthCheckGracePeriodSeconds": 60
 }
