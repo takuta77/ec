@@ -35,6 +35,9 @@ env:
 jobs:
   build-and-push:
     name: build-and-push
+    # AWS アカウント未プロビジョン (= vars.AWS_ACCOUNT_ID 未設定) の間は skip。
+    # README §2 の手順で repo variable を設定後、自動的に走り始める。
+    if: ${{ vars.AWS_ACCOUNT_ID != '' }}
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.tag.outputs.tag }}
@@ -87,8 +90,10 @@ jobs:
 
   approval:
     name: approval
-    needs: migrate
-    if: ${{ always() && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') }}
+    needs: [build-and-push, migrate]
+    # always() で migrate skip ケース (skip_migrate=true) も拾うが、
+    # build-and-push が skip / fail のケースでは approval を起動しない。
+    if: ${{ always() && needs.build-and-push.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') }}
     runs-on: ubuntu-latest
     environment: production
     steps:

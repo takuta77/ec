@@ -28,6 +28,9 @@ env:
 jobs:
   plan:
     name: plan
+    # AWS アカウント未プロビジョン (= vars.AWS_ACCOUNT_ID 未設定) の間は skip。
+    # README §2 の手順で repo variable を設定後、自動的に走り始める。
+    if: ${{ vars.AWS_ACCOUNT_ID != '' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -66,7 +69,7 @@ jobs:
   apply:
     name: apply
     needs: plan
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: ${{ vars.AWS_ACCOUNT_ID != '' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     environment: production
     defaults:
