@@ -42,7 +42,9 @@ dev = [
     "testcontainers[postgres,rabbitmq]>=4.14.2",
     "ruff>=0.8",
     "mypy>=1.13",
-    "jsonschema>=4.26.0",
+    # capped <4.26 because semgrep 1.163.0 pins jsonschema<4.26.dev0.
+    # Bump to >=4.26 once semgrep widens its constraint.
+    "jsonschema>=4.25,<4.26",
     "pip-audit>=2.7",
     "semgrep>=1.95",
     "types-passlib>=1.7",

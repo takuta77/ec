@@ -11,6 +11,11 @@ updates:
     groups:
       python-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # semgrep 1.163.0 pins jsonschema<4.26.dev0; drop this ignore once
+      # semgrep widens its upper bound.
+      - dependency-name: "jsonschema"
+        versions: [">=4.26"]
     labels:
       - "dependencies"
       - "python"

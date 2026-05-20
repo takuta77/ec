@@ -441,12 +441,12 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aio-pika", specifier = ">=9.5" },
+    { name = "aio-pika", specifier = ">=9.6.2" },
     { name = "alembic", specifier = ">=1.14" },
     { name = "asyncpg", specifier = ">=0.30" },
-    { name = "bcrypt", specifier = "<4.1" },
+    { name = "bcrypt", specifier = "<5.1" },
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "httpx", specifier = ">=0.27" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "opentelemetry-api", specifier = ">=1.29" },
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.29" },
     { name = "opentelemetry-instrumentation-aio-pika", specifier = ">=0.50b0" },
@@ -460,14 +460,14 @@ requires-dist = [
     { name = "pydantic", extras = ["email"], specifier = ">=2.9" },
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.36" },
-    { name = "structlog", specifier = ">=24.4" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.49" },
+    { name = "structlog", specifier = ">=25.5.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "jsonschema", specifier = ">=4.23" },
+    { name = "jsonschema", specifier = ">=4.25,<4.26" },
     { name = "mypy", specifier = ">=1.13" },
     { name = "pip-audit", specifier = ">=2.7" },
     { name = "pytest", specifier = ">=8.3" },
@@ -475,9 +475,9 @@ dev = [
     { name = "pytest-cov", specifier = ">=6.0" },
     { name = "ruff", specifier = ">=0.8" },
     { name = "semgrep", specifier = ">=1.95" },
-    { name = "testcontainers", extras = ["postgres", "rabbitmq"], specifier = ">=4.8" },
+    { name = "testcontainers", extras = ["postgres", "rabbitmq"], specifier = ">=4.14.2" },
     { name = "types-passlib", specifier = ">=1.7" },
-    { name = "types-python-jose", specifier = ">=3.3" },
+    { name = "types-python-jose", specifier = ">=3.5.0.20260408" },
 ]
 
 [[package]]
