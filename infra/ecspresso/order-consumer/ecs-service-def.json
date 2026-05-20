@@ -1,0 +1,14 @@
+{
+  "launchType": "FARGATE",
+  "desiredCount": 1,
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": [
+        "{{ tfstate `aws_subnet.private[0].id` }}",
+        "{{ tfstate `aws_subnet.private[1].id` }}"
+      ],
+      "securityGroups": ["{{ tfstate `aws_security_group.app.id` }}"],
+      "assignPublicIp": "DISABLED"
+    }
+  }
+}

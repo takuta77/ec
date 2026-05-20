@@ -1,0 +1,37 @@
+{
+  "family": "ec-api-prod-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "{{ tfstate `aws_iam_role.ecs_task_execution.arn` }}",
+  "taskRoleArn": "{{ tfstate `aws_iam_role.ecs_task.arn` }}",
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "{{ tfstate `aws_ecr_repository.app.repository_url` }}:{{ must_env `IMAGE_TAG` }}",
+      "essential": true,
+      "command": ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"],
+      "portMappings": [{ "containerPort": 8000, "protocol": "tcp" }],
+      "environment": [
+        { "name": "SERVE_FRONTEND", "value": "false" },
+        { "name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://localhost:4317" }
+      ],
+      "secrets": [
+        { "name": "DATABASE_URL", "valueFrom": "{{ tfstate `aws_secretsmanager_secret.app[\"database_url\"].arn` }}" },
+        { "name": "RABBITMQ_URL", "valueFrom": "{{ tfstate `aws_secretsmanager_secret.app[\"rabbitmq_url\"].arn` }}" },
+        { "name": "JWT_PRIVATE_KEY", "valueFrom": "{{ tfstate `aws_secretsmanager_secret.app[\"jwt_private_key\"].arn` }}" },
+        { "name": "JWT_PUBLIC_KEY", "valueFrom": "{{ tfstate `aws_secretsmanager_secret.app[\"jwt_public_key\"].arn` }}" },
+        { "name": "NEW_RELIC_LICENSE_KEY", "valueFrom": "{{ tfstate `aws_secretsmanager_secret.app[\"new_relic_license_key\"].arn` }}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "{{ tfstate `aws_cloudwatch_log_group.ecs.name` }}",
+          "awslogs-region": "{{ must_env `AWS_REGION` }}",
+          "awslogs-stream-prefix": "api"
+        }
+      }
+    }
+  ]
+}
