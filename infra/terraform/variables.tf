@@ -33,3 +33,8 @@ variable "github_repo" {
   description = "owner/name for GitHub OIDC trust"
   default     = "takuta77/ec"
 }
+
+variable "tfstate_bucket" {
+  type        = string
+  description = "S3 bucket holding terraform state (granted to GitHub deploy role)"
+}
