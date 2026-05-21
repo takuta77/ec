@@ -9,6 +9,7 @@ __pycache__/
 htmlcov/
 secrets/
 .env
+.env.jwt
 
 # Terraform
 infra/terraform/.terraform/
