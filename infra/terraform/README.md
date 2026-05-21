@@ -133,7 +133,7 @@ terraform output
 
 Push or merge to `main` (excluding pure docs/infra-only changes) triggers `cd.yml`:
 
-1. **build-and-push**: builds the docker image, tags with the short git SHA, pushes to ECR
+1. **build-and-push** (matrix: `app`, `otel-collector`): builds both docker images in parallel from the same short git SHA, pushes each to its dedicated ECR repo (`ec-api`, `ec-api-otel-collector`)
 2. **migrate**: runs `alembic upgrade head` as a one-off ECS task via `ecspresso run`
 3. **approval**: pauses on the `production` GitHub Environment until a reviewer approves
 4. **deploy-api** (parallel): `ecspresso deploy` — ECS Native Blue/Green, 5-min bake, abort on `api-5xx-*` or `api-unhealthy-*` alarms
@@ -216,12 +216,11 @@ This re-builds (or re-uses) the image for that SHA, re-runs migration (or skip i
 
 ---
 
-## 8. Known boundaries (C-1a + C-1b)
+## 8. Known boundaries (C-1a + C-1b + C-1c)
 
 | Item | Status | Follow-up |
 |------|--------|-----------|
-| JWT key injection | Secrets Manager injects keys as env vars but the app currently reads `JWT_PRIVATE_KEY_PATH` | **C-1c** |
-| TLS / HTTPS | ALB is HTTP-only; no ACM certificate or Route 53 record | C-1c or independent PR |
+| TLS / HTTPS | ALB is HTTP-only; no ACM certificate or Route 53 record | independent PR |
 | RDS availability | Single-AZ (cost-optimised) | Multi-AZ promotion as follow-up |
 | NAT Gateway | Single NAT (one AZ) | Per-AZ NATs for HA |
 | Multi-environment (staging) | env=prod hardcoded in `variables.tf` | Terraform workspace or directory split |
@@ -230,3 +229,4 @@ This re-builds (or re-uses) the image for that SHA, re-runs migration (or skip i
 | Plan policy check | No OPA / Sentinel guardrail on `terraform plan` | Optional follow-up |
 | Notifications | No Slack/Teams hook on deploy success/failure | Optional follow-up |
 | Secret rotation | Manual `put-secret-value` only | AWS Secrets Manager rotation lambda (follow-up) |
+| OTel sidecar | Each ECS task includes an `otel-collector` sidecar (port 4317 internal) that forwards OTLP traffic to New Relic via `otlphttp/newrelic` exporter. `NEW_RELIC_LICENSE_KEY` is read only by the sidecar container (not the app). | Centralized collector (single ECS service via Service Connect) for resource efficiency |
