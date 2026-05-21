@@ -20,8 +20,7 @@
         { "name": "DATABASE_URL", "valueFrom": "{{ tfstate `aws_secretsmanager_secret.app[\"database_url\"].arn` }}" },
         { "name": "RABBITMQ_URL", "valueFrom": "{{ tfstate `aws_secretsmanager_secret.app[\"rabbitmq_url\"].arn` }}" },
         { "name": "JWT_PRIVATE_KEY", "valueFrom": "{{ tfstate `aws_secretsmanager_secret.app[\"jwt_private_key\"].arn` }}" },
-        { "name": "JWT_PUBLIC_KEY", "valueFrom": "{{ tfstate `aws_secretsmanager_secret.app[\"jwt_public_key\"].arn` }}" },
-        { "name": "NEW_RELIC_LICENSE_KEY", "valueFrom": "{{ tfstate `aws_secretsmanager_secret.app[\"new_relic_license_key\"].arn` }}" }
+        { "name": "JWT_PUBLIC_KEY", "valueFrom": "{{ tfstate `aws_secretsmanager_secret.app[\"jwt_public_key\"].arn` }}" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
@@ -29,6 +28,25 @@
           "awslogs-group": "{{ tfstate `aws_cloudwatch_log_group.ecs.name` }}",
           "awslogs-region": "{{ must_env `AWS_REGION` }}",
           "awslogs-stream-prefix": "outbox-relay"
+        }
+      }
+    },
+    {
+      "name": "otel-collector",
+      "image": "{{ tfstate `aws_ecr_repository.otel_collector.repository_url` }}:{{ must_env `IMAGE_TAG` }}",
+      "essential": true,
+      "cpu": 0,
+      "memoryReservation": 128,
+      "portMappings": [{ "containerPort": 4317, "protocol": "tcp" }],
+      "secrets": [
+        { "name": "NEW_RELIC_LICENSE_KEY", "valueFrom": "{{ tfstate `aws_secretsmanager_secret.app[\"new_relic_license_key\"].arn` }}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "{{ tfstate `aws_cloudwatch_log_group.ecs.name` }}",
+          "awslogs-region": "{{ must_env `AWS_REGION` }}",
+          "awslogs-stream-prefix": "outbox-relay-otel"
         }
       }
     }
