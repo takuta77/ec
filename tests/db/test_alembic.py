@@ -24,8 +24,8 @@ def test_alembic_env_py_is_importable() -> None:
         "postgresql+asyncpg://placeholder:placeholder@localhost/placeholder",
     )
     env.setdefault("RABBITMQ_URL", "amqp://guest:guest@localhost/")
-    env.setdefault("JWT_PRIVATE_KEY_PATH", "/tmp/priv.pem")
-    env.setdefault("JWT_PUBLIC_KEY_PATH", "/tmp/pub.pem")
+    env.setdefault("JWT_PRIVATE_KEY", "x")
+    env.setdefault("JWT_PUBLIC_KEY", "x")
     env.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
 
     out = subprocess.run(

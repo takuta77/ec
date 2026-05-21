@@ -6,8 +6,8 @@ from app.core.config import Settings
 def test_settings_loads_required_fields(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://x:y@localhost/ec")
     monkeypatch.setenv("RABBITMQ_URL", "amqp://guest:guest@localhost/")
-    monkeypatch.setenv("JWT_PRIVATE_KEY_PATH", "/tmp/priv.pem")
-    monkeypatch.setenv("JWT_PUBLIC_KEY_PATH", "/tmp/pub.pem")
+    monkeypatch.setenv("JWT_PRIVATE_KEY", "dummy-priv-pem")
+    monkeypatch.setenv("JWT_PUBLIC_KEY", "dummy-pub-pem")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4317")
 
     s = Settings()

@@ -65,18 +65,11 @@ def jwt_keys() -> tuple[str, str]:
 @pytest.fixture
 async def app_with_db(database_url, jwt_keys, monkeypatch):
     priv, pub = jwt_keys
-    from pathlib import Path
-    import tempfile
-
-    priv_path = Path(tempfile.mkstemp(suffix=".pem")[1])
-    priv_path.write_text(priv)
-    pub_path = Path(tempfile.mkstemp(suffix=".pem")[1])
-    pub_path.write_text(pub)
 
     monkeypatch.setenv("DATABASE_URL", database_url)
     monkeypatch.setenv("RABBITMQ_URL", "amqp://guest:guest@localhost/")
-    monkeypatch.setenv("JWT_PRIVATE_KEY_PATH", str(priv_path))
-    monkeypatch.setenv("JWT_PUBLIC_KEY_PATH", str(pub_path))
+    monkeypatch.setenv("JWT_PRIVATE_KEY", priv)
+    monkeypatch.setenv("JWT_PUBLIC_KEY", pub)
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
 
     from app.core.config import get_settings

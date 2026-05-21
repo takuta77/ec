@@ -9,8 +9,8 @@ from starlette.testclient import TestClient
 def _base_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://x:x@localhost/x")
     monkeypatch.setenv("RABBITMQ_URL", "amqp://guest:guest@localhost/")
-    monkeypatch.setenv("JWT_PRIVATE_KEY_PATH", "/tmp/x.pem")
-    monkeypatch.setenv("JWT_PUBLIC_KEY_PATH", "/tmp/x.pem")
+    monkeypatch.setenv("JWT_PRIVATE_KEY", "x")
+    monkeypatch.setenv("JWT_PUBLIC_KEY", "x")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
 
 
@@ -68,8 +68,8 @@ def test_spa_served_when_dist_present(monkeypatch: pytest.MonkeyPatch, tmp_path:
 def test_settings_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://x:x@localhost/x")
     monkeypatch.setenv("RABBITMQ_URL", "amqp://guest:guest@localhost/")
-    monkeypatch.setenv("JWT_PRIVATE_KEY_PATH", "/tmp/x.pem")
-    monkeypatch.setenv("JWT_PUBLIC_KEY_PATH", "/tmp/x.pem")
+    monkeypatch.setenv("JWT_PRIVATE_KEY", "x")
+    monkeypatch.setenv("JWT_PUBLIC_KEY", "x")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
     monkeypatch.delenv("SERVE_FRONTEND", raising=False)
     monkeypatch.delenv("FRONTEND_DIST_PATH", raising=False)
@@ -84,8 +84,8 @@ def test_settings_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_settings_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://x:x@localhost/x")
     monkeypatch.setenv("RABBITMQ_URL", "amqp://guest:guest@localhost/")
-    monkeypatch.setenv("JWT_PRIVATE_KEY_PATH", "/tmp/x.pem")
-    monkeypatch.setenv("JWT_PUBLIC_KEY_PATH", "/tmp/x.pem")
+    monkeypatch.setenv("JWT_PRIVATE_KEY", "x")
+    monkeypatch.setenv("JWT_PUBLIC_KEY", "x")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
     monkeypatch.setenv("SERVE_FRONTEND", "true")
     monkeypatch.setenv("FRONTEND_DIST_PATH", "/custom/dist")

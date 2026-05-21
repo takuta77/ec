@@ -1,5 +1,4 @@
 from functools import lru_cache
-from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -12,8 +11,8 @@ class Settings(BaseSettings):
     rabbitmq_url: str
 
     jwt_algorithm: str = "RS256"
-    jwt_private_key_path: Path
-    jwt_public_key_path: Path
+    jwt_private_key: str
+    jwt_public_key: str
     jwt_access_ttl_min: int = 15
     jwt_refresh_ttl_days: int = 14
 

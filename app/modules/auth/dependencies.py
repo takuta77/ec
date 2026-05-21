@@ -23,7 +23,7 @@ async def get_current_user(
         raise AuthError("Missing bearer token")
     token = authorization.split(" ", 1)[1]
     settings = get_settings()
-    pub = settings.jwt_public_key_path.read_text()
+    pub = settings.jwt_public_key
     try:
         payload = decode_token(token, public_key=pub)
     except JWTError as e:
