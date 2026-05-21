@@ -1,0 +1,94 @@
+name: terraform
+
+on:
+  pull_request:
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-1
+  TF_VERSION: "1.10.5"
+
+jobs:
+  plan:
+    name: plan
+    # AWS アカウント未プロビジョン (= vars.AWS_ACCOUNT_ID 未設定) の間は skip。
+    # README §2 の手順で repo variable を設定後、自動的に走り始める。
+    if: ${{ vars.AWS_ACCOUNT_ID != '' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a  # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/ec-api-prod-gh-deploy
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd  # v3.1.2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - name: terraform init
+        run: terraform init
+      - name: terraform plan
+        run: |
+          terraform plan -out=tfplan -var "tfstate_bucket=${{ vars.TFSTATE_BUCKET }}"
+      - name: upload plan artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: tfplan
+          path: infra/terraform/tfplan
+          retention-days: 7
+      - name: install tfcmt
+        if: github.event_name == 'pull_request'
+        uses: shmokmt/actions-setup-tfcmt@04d5aa6dc61eaa69a4d00257224c9b97f4857819  # v2.1.1
+      - name: comment plan on PR
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          terraform show -no-color tfplan | tfcmt plan -patch
+
+  apply:
+    name: apply
+    needs: plan
+    if: ${{ vars.AWS_ACCOUNT_ID != '' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a  # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/ec-api-prod-gh-deploy
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd  # v3.1.2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131  # v7.0.0
+        with:
+          name: tfplan
+          path: infra/terraform
+      - name: terraform init
+        run: terraform init
+      - name: terraform apply
+        run: terraform apply tfplan

@@ -52,6 +52,22 @@ resource "aws_lb_target_group" "api" {
   }
 }
 
+resource "aws_lb_target_group" "api_green" {
+  name        = "${var.project}-${var.env}-api-green"
+  port        = 8000
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    path                = "/healthz"
+    matcher             = "200"
+    interval            = 30
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+  }
+}
+
 # HTTPS/TLS は Route53 + ACM とセットで C-1c に切り出し済み (spec §11)。
 # 暫定で HTTP-only。TLS 対応時に listener 443 を追加 + 80 は redirect に切り替える。
 resource "aws_lb_listener" "http" {
@@ -63,5 +79,52 @@ resource "aws_lb_listener" "http" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  lifecycle {
+    # ECS Native B/G rewrites the listener forward target group during deploys;
+    # let Terraform ignore that drift.
+    ignore_changes = [default_action]
+  }
+}
+
+locals {
+  api_target_groups = {
+    blue  = aws_lb_target_group.api.arn_suffix
+    green = aws_lb_target_group.api_green.arn_suffix
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "api_5xx" {
+  for_each            = local.api_target_groups
+  alarm_name          = "${var.project}-${var.env}-api-5xx-${each.key}"
+  metric_name         = "HTTPCode_Target_5XX_Count"
+  namespace           = "AWS/ApplicationELB"
+  statistic           = "Sum"
+  period              = 60
+  evaluation_periods  = 2
+  threshold           = 5
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  dimensions = {
+    LoadBalancer = aws_lb.main.arn_suffix
+    TargetGroup  = each.value
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "api_unhealthy" {
+  for_each            = local.api_target_groups
+  alarm_name          = "${var.project}-${var.env}-api-unhealthy-${each.key}"
+  metric_name         = "UnHealthyHostCount"
+  namespace           = "AWS/ApplicationELB"
+  statistic           = "Maximum"
+  period              = 30
+  evaluation_periods  = 2
+  threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  dimensions = {
+    LoadBalancer = aws_lb.main.arn_suffix
+    TargetGroup  = each.value
   }
 }

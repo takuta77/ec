@@ -1,6 +1,15 @@
 {
   "launchType": "FARGATE",
   "desiredCount": 1,
+  "deploymentController": { "type": "ECS" },
+  "deploymentConfiguration": {
+    "maximumPercent": 200,
+    "minimumHealthyPercent": 100,
+    "deploymentCircuitBreaker": {
+      "enable": true,
+      "rollback": true
+    }
+  },
   "networkConfiguration": {
     "awsvpcConfiguration": {
       "subnets": [

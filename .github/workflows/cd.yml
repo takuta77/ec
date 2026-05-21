@@ -1,0 +1,150 @@
+name: cd
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'infra/terraform/**'
+      - 'docs/**'
+      - '*.md'
+      - '.github/workflows/terraform.yml'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git SHA to deploy (default: HEAD of main)"
+        required: false
+        type: string
+      skip_migrate:
+        description: "Skip alembic migration step (hotfix only)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write   # OIDC
+  contents: read
+
+concurrency:
+  group: cd-prod
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-1
+  IMAGE_TAG: ${{ github.event.inputs.ref || github.sha }}
+
+jobs:
+  build-and-push:
+    name: build-and-push
+    # AWS アカウント未プロビジョン (= vars.AWS_ACCOUNT_ID 未設定) の間は skip。
+    # README §2 の手順で repo variable を設定後、自動的に走り始める。
+    if: ${{ vars.AWS_ACCOUNT_ID != '' }}
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ env.IMAGE_TAG }}
+      - id: tag
+        run: |
+          SHORT=$(git rev-parse --short=7 HEAD)
+          echo "tag=$SHORT" >> "$GITHUB_OUTPUT"
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a  # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/ec-api-prod-gh-deploy
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@fa648b43de3d4d023bcb3f89ed6940096949c419  # v2.1.5
+        id: ecr
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3.12.0
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6.19.2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/ec-api:${{ steps.tag.outputs.tag }}
+          provenance: false
+
+  migrate:
+    name: migrate
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.skip_migrate != 'true' }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ env.IMAGE_TAG }}
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a  # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/ec-api-prod-gh-deploy
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: kayac/ecspresso@3d47a637a1f8f2dd5c91bb616ac4b7a0e55b18ca  # v2.8.4
+        with:
+          version: v2.5.0
+      - name: alembic upgrade head
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+        run: |
+          ecspresso run \
+            --config infra/ecspresso/api/ecspresso.yml \
+            --overrides '{"containerOverrides":[{"name":"app","command":["alembic","upgrade","head"]}]}' \
+            --wait-until=stopped
+
+  approval:
+    name: approval
+    needs: [build-and-push, migrate]
+    # always() で migrate skip ケース (skip_migrate=true) も拾うが、
+    # build-and-push が skip / fail のケースでは approval を起動しない。
+    if: ${{ always() && needs.build-and-push.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - run: echo "Approved by ${{ github.actor }} - proceeding to deploy"
+
+  deploy-api:
+    name: deploy-api
+    needs: [approval, build-and-push]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ env.IMAGE_TAG }}
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a  # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/ec-api-prod-gh-deploy
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: kayac/ecspresso@3d47a637a1f8f2dd5c91bb616ac4b7a0e55b18ca  # v2.8.4
+        with:
+          version: v2.5.0
+      - name: deploy api (Blue/Green)
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+        run: |
+          ecspresso deploy --config infra/ecspresso/api/ecspresso.yml \
+            --wait-until=service-stable
+
+  deploy-workers:
+    name: deploy-workers
+    needs: [approval, build-and-push]
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [outbox-relay, order-consumer, checkout-sweeper]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ env.IMAGE_TAG }}
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a  # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/ec-api-prod-gh-deploy
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: kayac/ecspresso@3d47a637a1f8f2dd5c91bb616ac4b7a0e55b18ca  # v2.8.4
+        with:
+          version: v2.5.0
+      - name: deploy ${{ matrix.service }}
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+        run: |
+          ecspresso deploy --config infra/ecspresso/${{ matrix.service }}/ecspresso.yml \
+            --wait-until=service-stable

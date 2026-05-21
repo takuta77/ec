@@ -79,29 +79,3 @@ jobs:
           name: coverage-xml-slow
           path: coverage-slow.xml
           retention-days: 14
-
-  terraform:
-    name: terraform
-    runs-on: ubuntu-latest
-    continue-on-error: true  # warn-only initially (promote to required in C-1b)
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-      - uses: opentofu/setup-opentofu@847eaa4afeb791b06daa46e8eafa8b1b68d7cfb4  # v2.0.1
-        with:
-          tofu_version: "1.12.0"
-      - name: fmt
-        run: tofu -chdir=infra/terraform fmt -check -recursive
-      - name: init + validate
-        run: |
-          tofu -chdir=infra/terraform init -backend=false
-          tofu -chdir=infra/terraform validate
-      - uses: terraform-linters/setup-tflint@b480b8fcdaa6f2c577f8e4fa799e89e756bb7c93  # v6.2.2
-        with:
-          tflint_version: latest
-      - name: tflint
-        run: |
-          cd infra/terraform
-          tflint --init
-          tflint
-      - name: ecspresso json syntax
-        run: find infra/ecspresso -name '*.json' -exec jq empty {} \;

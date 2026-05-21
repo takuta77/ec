@@ -41,3 +41,15 @@ output "log_group_name" {
 output "secret_arns" {
   value = { for k, s in aws_secretsmanager_secret.app : k => s.arn }
 }
+
+output "alb_target_group_green_arn" {
+  value = aws_lb_target_group.api_green.arn
+}
+
+output "api_5xx_alarm_names" {
+  value = [for k, v in aws_cloudwatch_metric_alarm.api_5xx : v.alarm_name]
+}
+
+output "api_unhealthy_alarm_names" {
+  value = [for k, v in aws_cloudwatch_metric_alarm.api_unhealthy : v.alarm_name]
+}
