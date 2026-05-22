@@ -34,11 +34,23 @@ env:
 
 jobs:
   build-and-push:
-    name: build-and-push
+    name: build-and-push (${{ matrix.image }})
     # AWS アカウント未プロビジョン (= vars.AWS_ACCOUNT_ID 未設定) の間は skip。
     # README §2 の手順で repo variable を設定後、自動的に走り始める。
     if: ${{ vars.AWS_ACCOUNT_ID != '' }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: app
+            dockerfile: docker/Dockerfile
+            context: .
+            ecr_repo: ec-api
+          - image: otel-collector
+            dockerfile: docker/otel-collector/Dockerfile
+            context: docker/otel-collector
+            ecr_repo: ec-api-otel-collector
     outputs:
       image_tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -58,9 +70,10 @@ jobs:
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3.12.0
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6.19.2
         with:
-          context: .
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
-          tags: ${{ steps.ecr.outputs.registry }}/ec-api:${{ steps.tag.outputs.tag }}
+          tags: ${{ steps.ecr.outputs.registry }}/${{ matrix.ecr_repo }}:${{ steps.tag.outputs.tag }}
           provenance: false
 
   migrate:

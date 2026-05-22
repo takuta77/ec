@@ -371,8 +371,8 @@ async def test_cli_count_smoke(rabbitmq_connection, rabbitmq_container) -> None:
     env = {
         "RABBITMQ_URL": url,
         "DATABASE_URL": "postgresql+asyncpg://x:x@localhost/x",
-        "JWT_PRIVATE_KEY_PATH": "/tmp/x.pem",
-        "JWT_PUBLIC_KEY_PATH": "/tmp/x.pem",
+        "JWT_PRIVATE_KEY": "x",
+        "JWT_PUBLIC_KEY": "x",
         "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
         "PATH": "/usr/bin:/bin",
     }

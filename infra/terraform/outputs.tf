@@ -53,3 +53,7 @@ output "api_5xx_alarm_names" {
 output "api_unhealthy_alarm_names" {
   value = [for k, v in aws_cloudwatch_metric_alarm.api_unhealthy : v.alarm_name]
 }
+
+output "otel_collector_ecr_repository_url" {
+  value = aws_ecr_repository.otel_collector.repository_url
+}

@@ -21,8 +21,8 @@ def _service(session: AsyncSession) -> AuthService:
     return AuthService(
         users=UsersRepository(session),
         refresh_tokens=RefreshTokensRepository(session),
-        jwt_private_key=s.jwt_private_key_path.read_text(),
-        jwt_public_key=s.jwt_public_key_path.read_text(),
+        jwt_private_key=s.jwt_private_key,
+        jwt_public_key=s.jwt_public_key,
         access_ttl_min=s.jwt_access_ttl_min,
         refresh_ttl_days=s.jwt_refresh_ttl_days,
     )
