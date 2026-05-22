@@ -7,4 +7,12 @@
 #   - expires_at: YYYY-MM-DD, at most 60 days from when added
 #
 # The `deps` CI job rejects expired entries.
-ignores: []
+ignores:
+  - vuln_id: PYSEC-2025-185
+    package: python-jose
+    reason: >-
+      CVE-2024-29370: DoS via decompression bomb during JWE decryption.
+      Our app only uses JWS (jose.jwt sign/verify) — no JWE decryption code
+      path is exercised. Upstream has no patched release yet (3.5.0 latest).
+      Revisit when python-jose ships a fix or when we migrate to PyJWT.
+    expires_at: 2026-07-21
