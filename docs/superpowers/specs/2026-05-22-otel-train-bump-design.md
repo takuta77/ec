@@ -37,6 +37,7 @@ C-1a/C-1b/C-1c と同じく、実 AWS / 実 New Relic への送信検証は **op
 | 上限ピン | **なし** (既存スタイル `>=` のみを踏襲) |
 | pyproject.toml で変更する直接依存 | 9 件 (api/sdk/exporter-otlp + 6 contrib) |
 | transitive (uv.lock のみ) | 約 10 件、`uv lock` 再生成で同 train に整列 |
+| dev dep の transitive 衝突 | `[tool.uv] override-dependencies` で `opentelemetry-api/sdk/exporter-otlp-proto-http >=1.42` を強制 (semgrep が `<1.38` に pin しているため) |
 | 検証範囲 | static のみ (ruff/mypy/pytest + import smoke) |
 | `app/core/telemetry.py` 修正 | 必要時のみ (instrumentation API 変更があれば追従) |
 | dependabot 既存 PR | #36 / #39 を本 PR にて supersede、merge 後 close |
@@ -84,7 +85,7 @@ from opentelemetry.instrumentation.logging import LoggingInstrumentor
 
 | File | Action | Owns |
 |---|---|---|
-| `pyproject.toml` | Modify | 9 行の specifier 更新 (下記 §6.1) |
+| `pyproject.toml` | Modify | 9 行の specifier 更新 + `[tool.uv] override-dependencies` セクション追加 (下記 §6.1, §6.5) |
 | `uv.lock` | Regenerate | `uv lock` の出力差分 (約 19 packages の version 行) |
 | `app/core/telemetry.py` | Modify (条件付き) | instrumentation API 破壊的変更が出た時のみ追従 |
 
@@ -153,6 +154,25 @@ uv run python -c "from app.core.telemetry import init_telemetry; print('ok')"
 - 該当 import の rename / 移動を OTel 上流 changelog で確認
 - `app/core/telemetry.py` の該当行を最小限修正
 - 再度 §6.3 を実行 → 全 green になるまで反復
+
+### 6.5 [tool.uv] override-dependencies (semgrep transitive 衝突回避)
+
+`semgrep` (dev dep) が `opentelemetry-api` / `opentelemetry-sdk` / `opentelemetry-exporter-otlp-proto-http` を古いバージョン (`<1.38`) に pin しているため、§6.1 の specifier 更新だけでは `uv lock` が解決不能になる。`pyproject.toml` に以下のセクションを追加:
+
+```toml
+[tool.uv]
+# semgrep pins opentelemetry-* to narrow ranges (<1.26 or <1.38) that conflict
+# with our runtime requirement (>=1.42). semgrep uses OTel only for its own
+# telemetry; forcing the newer packages is safe — the public API is
+# backwards-compatible within the 1.x train.
+override-dependencies = [
+    "opentelemetry-api>=1.42",
+    "opentelemetry-sdk>=1.42",
+    "opentelemetry-exporter-otlp-proto-http>=1.42",
+]
+```
+
+範囲は semgrep が実際 pin している 3 パッケージに限定。semgrep が将来 OTel pin を緩めた時はこのセクションを削除して `uv lock` 再生成。
 
 ## 7. 失敗モードと対処
 
