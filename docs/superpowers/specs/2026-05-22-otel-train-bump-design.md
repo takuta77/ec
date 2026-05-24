@@ -157,22 +157,24 @@ uv run python -c "from app.core.telemetry import init_telemetry; print('ok')"
 
 ### 6.5 [tool.uv] override-dependencies (semgrep transitive 衝突回避)
 
-`semgrep` (dev dep) が `opentelemetry-api` / `opentelemetry-sdk` / `opentelemetry-exporter-otlp-proto-http` を古いバージョン (`<1.38`) に pin しているため、§6.1 の specifier 更新だけでは `uv lock` が解決不能になる。`pyproject.toml` に以下のセクションを追加:
+`semgrep` (dev dep) は OTel 5 パッケージを `~=1.37.0` / `~=0.58b0` に pin しているため、§6.1 の specifier 更新だけでは `uv lock` が解決不能になる。`pyproject.toml` に以下のセクションを追加:
 
 ```toml
 [tool.uv]
-# semgrep pins opentelemetry-* to narrow ranges (<1.26 or <1.38) that conflict
-# with our runtime requirement (>=1.42). semgrep uses OTel only for its own
-# telemetry; forcing the newer packages is safe — the public API is
-# backwards-compatible within the 1.x train.
+# semgrep (dev) pins 5 OTel packages to ~=1.37.0 / ~=0.58b0, which conflicts
+# with our runtime requirement (>=1.42 / >=0.63b0). semgrep uses OTel only for
+# its own telemetry; forcing the newer packages is safe — the OTel public API
+# is backwards-compatible within the 1.x stable and 0.x contrib trains.
 override-dependencies = [
     "opentelemetry-api>=1.42",
     "opentelemetry-sdk>=1.42",
     "opentelemetry-exporter-otlp-proto-http>=1.42",
+    "opentelemetry-instrumentation-requests>=0.63b0",
+    "opentelemetry-instrumentation-threading>=0.63b0",
 ]
 ```
 
-範囲は semgrep が実際 pin している 3 パッケージに限定。semgrep が将来 OTel pin を緩めた時はこのセクションを削除して `uv lock` 再生成。
+範囲は semgrep が実際 pin している 5 パッケージに限定。semgrep が将来 OTel pin を緩めた時はこのセクションを削除して `uv lock` 再生成。
 
 ## 7. 失敗モードと対処
 

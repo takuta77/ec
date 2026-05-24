@@ -6,6 +6,8 @@ requires-python = "==3.12.*"
 overrides = [
     { name = "opentelemetry-api", specifier = ">=1.42" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.42" },
+    { name = "opentelemetry-instrumentation-requests", specifier = ">=0.63b0" },
+    { name = "opentelemetry-instrumentation-threading", specifier = ">=0.63b0" },
     { name = "opentelemetry-sdk", specifier = ">=1.42" },
 ]
 
