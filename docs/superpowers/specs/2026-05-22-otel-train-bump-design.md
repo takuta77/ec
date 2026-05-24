@@ -155,9 +155,12 @@ uv run python -c "from app.core.telemetry import init_telemetry; print('ok')"
 - `app/core/telemetry.py` の該当行を最小限修正
 - 再度 §6.3 を実行 → 全 green になるまで反復
 
-### 6.5 [tool.uv] override-dependencies (semgrep transitive 衝突回避)
+### 6.5 [tool.uv] override-dependencies
 
-`semgrep` (dev dep) は OTel 5 パッケージを `~=1.37.0` / `~=0.58b0` に pin しているため、§6.1 の specifier 更新だけでは `uv lock` が解決不能になる。`pyproject.toml` に以下のセクションを追加:
+2 種類の override を 1 セクションにまとめる:
+
+1. **semgrep transitive 衝突回避** — `semgrep` (dev dep) は OTel 5 パッケージを `~=1.37.0` / `~=0.58b0` に pin しているため、§6.1 の specifier 更新だけでは `uv lock` が解決不能。
+2. **starlette PYSEC-2026-161 fix** — host header 検証バイパス。FastAPI 0.136.x の transitive で starlette 1.0.0 (vulnerable) が選ばれていた。fix は 1.0.1。これは OTel bump とは独立した脆弱性だが、同じ lock 再生成で同時に対処する。
 
 ```toml
 [tool.uv]
@@ -165,16 +168,20 @@ uv run python -c "from app.core.telemetry import init_telemetry; print('ok')"
 # with our runtime requirement (>=1.42 / >=0.63b0). semgrep uses OTel only for
 # its own telemetry; forcing the newer packages is safe — the OTel public API
 # is backwards-compatible within the 1.x stable and 0.x contrib trains.
+#
+# starlette: PYSEC-2026-161 (host header validation bypass) — fixed in 1.0.1.
+# FastAPI 0.136.x permits both 1.0.0 and 1.0.1; force the fix.
 override-dependencies = [
     "opentelemetry-api>=1.42",
     "opentelemetry-sdk>=1.42",
     "opentelemetry-exporter-otlp-proto-http>=1.42",
     "opentelemetry-instrumentation-requests>=0.63b0",
     "opentelemetry-instrumentation-threading>=0.63b0",
+    "starlette>=1.0.1",
 ]
 ```
 
-範囲は semgrep が実際 pin している 5 パッケージに限定。semgrep が将来 OTel pin を緩めた時はこのセクションを削除して `uv lock` 再生成。
+OTel 5 件は semgrep が pin を緩めた時に削除、starlette は FastAPI が `>=1.0.1` を直接 require するようになった時に削除。
 
 ## 7. 失敗モードと対処
 
