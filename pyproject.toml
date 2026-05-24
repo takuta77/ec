@@ -15,15 +15,15 @@ dependencies = [
     "python-jose[cryptography]>=3.3",
     "structlog>=25.5.0",
     "httpx>=0.28.1",
-    "opentelemetry-api>=1.29",
-    "opentelemetry-sdk>=1.29",
-    "opentelemetry-exporter-otlp>=1.29",
-    "opentelemetry-instrumentation-fastapi>=0.50b0",
-    "opentelemetry-instrumentation-sqlalchemy>=0.50b0",
-    "opentelemetry-instrumentation-asyncpg>=0.50b0",
-    "opentelemetry-instrumentation-aio-pika>=0.50b0",
-    "opentelemetry-instrumentation-httpx>=0.50b0",
-    "opentelemetry-instrumentation-logging>=0.50b0",
+    "opentelemetry-api>=1.42",
+    "opentelemetry-sdk>=1.42",
+    "opentelemetry-exporter-otlp>=1.42",
+    "opentelemetry-instrumentation-fastapi>=0.63b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.63b0",
+    "opentelemetry-instrumentation-asyncpg>=0.63b0",
+    "opentelemetry-instrumentation-aio-pika>=0.63b0",
+    "opentelemetry-instrumentation-httpx>=0.63b0",
+    "opentelemetry-instrumentation-logging>=0.63b0",
     "bcrypt<5.1",
 ]
 
@@ -62,3 +62,20 @@ target-version = "py312"
 [tool.mypy]
 python_version = "3.12"
 strict = true
+
+[tool.uv]
+# semgrep (dev) pins 5 OTel packages to ~=1.37.0 / ~=0.58b0, which conflicts
+# with our runtime requirement (>=1.42 / >=0.63b0). semgrep uses OTel only for
+# its own telemetry; forcing the newer packages is safe — the OTel public API
+# is backwards-compatible within the 1.x stable and 0.x contrib trains.
+#
+# starlette: PYSEC-2026-161 (host header validation bypass) — fixed in 1.0.1.
+# FastAPI 0.136.x permits both 1.0.0 and 1.0.1; force the fix.
+override-dependencies = [
+    "opentelemetry-api>=1.42",
+    "opentelemetry-sdk>=1.42",
+    "opentelemetry-exporter-otlp-proto-http>=1.42",
+    "opentelemetry-instrumentation-requests>=0.63b0",
+    "opentelemetry-instrumentation-threading>=0.63b0",
+    "starlette>=1.0.1",
+]
