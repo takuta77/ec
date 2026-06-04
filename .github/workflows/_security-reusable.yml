@@ -84,7 +84,7 @@ jobs:
             --config p/jwt \
             --sarif --output semgrep.sarif \
             --error
-      - uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba  # v4.35.5
+      - uses: github/codeql-action/upload-sarif@87557b9c84dde89fdd9b10e88954ac2f4248e463  # v4.36.1
         if: always()
         with:
           sarif_file: semgrep.sarif
@@ -108,7 +108,7 @@ jobs:
           GITLEAKS_CONFIG: .gitleaks.toml
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
           GITLEAKS_ENABLE_SUMMARY: "true"
-      - uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba  # v4.35.5
+      - uses: github/codeql-action/upload-sarif@87557b9c84dde89fdd9b10e88954ac2f4248e463  # v4.36.1
         if: always()
         with:
           sarif_file: results.sarif
@@ -129,7 +129,7 @@ jobs:
           output: trivy-image.sarif
           severity: HIGH,CRITICAL
           exit-code: "0"   # warn-only for now
-      - uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba  # v4.35.5
+      - uses: github/codeql-action/upload-sarif@87557b9c84dde89fdd9b10e88954ac2f4248e463  # v4.36.1
         if: always()
         with:
           sarif_file: trivy-image.sarif
@@ -147,7 +147,7 @@ jobs:
           format: sarif
           output-file: hadolint.sarif
           no-fail: true   # warn-only
-      - uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba  # v4.35.5
+      - uses: github/codeql-action/upload-sarif@87557b9c84dde89fdd9b10e88954ac2f4248e463  # v4.36.1
         if: always()
         with:
           sarif_file: hadolint.sarif
@@ -165,7 +165,7 @@ jobs:
           output_format: sarif
           output_file_path: ./checkov.sarif
           soft_fail: true   # warn-only
-      - uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba  # v4.35.5
+      - uses: github/codeql-action/upload-sarif@87557b9c84dde89fdd9b10e88954ac2f4248e463  # v4.36.1
         if: always()
         with:
           sarif_file: checkov.sarif/results_sarif.sarif
